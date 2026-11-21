@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Merge Bastion</title>
+<style>
+  html,body{margin:0;height:100%;background:#16210f;overflow:hidden;color:#fff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  body{display:flex;align-items:center;justify-content:center}
+  #wrap{position:relative;font-size:16px}
+  canvas{display:block;touch-action:none}
+  #ui{position:absolute;inset:0;pointer-events:none}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(14,22,8,.78);pointer-events:auto;text-align:center}
+  .screen.show{display:flex}
+  h1{margin:0 0 .15em;font-size:3.8em;line-height:.95;letter-spacing:.05em;color:#ffd54a;
+    text-shadow:0 .08em 0 #6b4a0e,0 .2em .4em rgba(0,0,0,.6)}
+  h2{margin:0 0 .5em;font-size:2.6em;color:#ffd54a;text-shadow:0 .08em 0 #6b4a0e}
+  .sub{margin:0 0 1.2em;font-size:1.15em;opacity:.9}
+  .hint{margin-top:1.2em;font-size:.85em;opacity:.65}
+  .row{display:flex;gap:.8em;margin-top:1em;flex-wrap:wrap;justify-content:center}
+  .btn{font:inherit;font-weight:700;font-size:1.1em;padding:.6em 1.3em;border:0;border-radius:.5em;cursor:pointer;
+    background:#ffd54a;color:#3d2a05;box-shadow:0 .2em 0 #a8841d}
+  .btn:active{transform:translateY(.1em);box-shadow:0 .1em 0 #a8841d}
+  .btn.big{font-size:1.35em;padding:.65em 1.6em}
+  .btn.alt{background:#e3ead8;box-shadow:0 .2em 0 #8e9a7c}
+  .btn.ad{background:#8e5bd9;color:#fff;box-shadow:0 .2em 0 #55318f}
+  .btn:disabled{opacity:.45;cursor:default}
+  #menuInfo{margin-top:1em;font-size:1.05em;opacity:.92}
+  #shopList{display:grid;grid-template-columns:repeat(4,12.5em);gap:.7em;margin-bottom:.4em}
+  .up{background:rgba(0,0,0,.35);border-radius:.6em;padding:.7em;text-align:left;display:flex;flex-direction:column;gap:.25em}
+  .up b{font-size:1em}
+  .up small{opacity:.8;font-size:.78em;min-height:2.3em}
+  .pips{display:flex;gap:.18em}
+  .pips i{flex:1;height:.4em;border-radius:1em;background:rgba(255,255,255,.15)}
+  .pips i.on{background:#ffd54a}
+  .up .btn{font-size:.85em;padding:.4em;margin-top:.2em}
+  #shopGems{font-size:1.2em;margin-bottom:.8em}
+  #overStats{font-size:1.15em;line-height:1.7}
+  #bar{position:absolute;left:0;right:0;bottom:0;height:6.25em;display:none;pointer-events:none}
+  #bar .btn{position:absolute;pointer-events:auto}
+  #summonBtn{left:50%;transform:translateX(-50%);bottom:1.1em;font-size:1.45em;padding:.55em 1.4em;min-width:9.5em}
+  #summonBtn:active{transform:translateX(-50%) translateY(.1em)}
+  #summonBtn small{display:block;font-size:.62em;opacity:.85;margin-top:.1em}
+  #giftBtn{left:calc(50% - 22em);bottom:1.6em;font-size:1em}
+  #speedBtn{right:2em;bottom:1.6em;font-size:1.1em;min-width:4.2em}
+  .corner{position:absolute;top:.75em;right:.9em;width:2.6em;height:2.6em;border-radius:.5em;border:0;font:inherit;font-weight:900;
+    background:rgba(0,0,0,.45);color:#fff;pointer-events:auto;cursor:pointer;z-index:5;padding:0}
+  #pauseBtn{right:4em;display:none}
+  #muteBtn{font-size:1.05em}
+  .adbox{background:#000;padding:2em 3em;border-radius:.6em;font-size:1.4em}
+  #adstub{z-index:10}
+  #rotate{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:#16210f;color:#ffd54a;font-size:22px;font-weight:800;text-align:center;padding:24px}
+  #rotate .ph{font-size:64px;animation:spin 2.2s ease-in-out infinite}
+  @keyframes spin{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  @media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <button id="pauseBtn" class="corner" aria-label="Pause">❚❚</button>
+    <button id="muteBtn" class="corner" aria-label="Mute">🔊</button>
+
+    <div id="bar">
+      <button id="giftBtn" class="btn ad">🎬 Free Lv 3 tower</button>
+      <button id="summonBtn" class="btn">SUMMON<small id="summonCost">🪙 10</small></button>
+      <button id="speedBtn" class="btn alt">▶ x1</button>
+    </div>
+
+    <div id="menu" class="screen show">
+      <h1>MERGE<br>BASTION</h1>
+      <p class="sub">Summon towers. Merge them. Hold the castle.</p>
+      <div class="row">
+        <button id="playBtn" class="btn big">▶ PLAY</button>
+        <button id="shopBtn" class="btn big alt">🔨 Workshop</button>
+      </div>
+      <div id="menuInfo"></div>
+      <p class="hint">Drag a tower onto an identical tower to merge it &nbsp;|&nbsp; Space: summon · F: speed · P: pause · M: mute</p>
+    </div>
+
+    <div id="shop" class="screen">
+      <h2>WORKSHOP</h2>
+      <div id="shopGems"></div>
+      <div id="shopList"></div>
+      <div class="row"><button id="shopBack" class="btn">◀ Back</button></div>
+    </div>
+
+    <div id="pause" class="screen">
+      <h2>PAUSED</h2>
+      <div class="row">
+        <button id="resumeBtn" class="btn big">▶ Resume</button>
+        <button id="quitBtn" class="btn alt">Quit to menu</button>
+      </div>
+    </div>
+
+    <div id="over" class="screen">
+      <h2>THE CASTLE FELL</h2>
+      <div id="overStats"></div>
+      <div class="row">
+        <button id="continueBtn" class="btn big">Continue</button>
+        <button id="reviveBtn" class="btn big ad">🎬 Rebuild walls</button>
+      </div>
+    </div>
+
+    <div id="adstub" class="screen"><div class="adbox">📺 An ad would play here<br><small>(test stub: no ad SDK loaded)</small></div></div>
+  </div>
+</div>
+<div id="rotate"><div class="ph">📱</div>Turn your phone sideways to play</div>
+<!-- SDK -->
+<script src="game.js"></script>
+</body>
+</html>

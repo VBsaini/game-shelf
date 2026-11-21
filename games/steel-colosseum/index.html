@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Steel Colosseum</title>
+<style>
+  html,body{margin:0;height:100%;background:#120d08;overflow:hidden;color:#fff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  body{display:flex;align-items:center;justify-content:center}
+  #wrap{position:relative;font-size:16px}
+  canvas{display:block;touch-action:none}
+  #ui{position:absolute;inset:0;pointer-events:none}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(24,14,6,.74);pointer-events:auto;text-align:center}
+  .screen.show{display:flex}
+  h1{margin:0 0 .2em;font-size:3.6em;line-height:.95;letter-spacing:.06em;color:#f5c542;
+    text-shadow:0 .08em 0 #7a4a12,0 .2em .4em rgba(0,0,0,.6)}
+  h2{margin:0 0 .5em;font-size:2.6em;color:#f5c542;text-shadow:0 .08em 0 #7a4a12}
+  .sub{margin:0 0 1.2em;font-size:1.15em;opacity:.9}
+  .hint{margin-top:1em;font-size:.85em;opacity:.65}
+  .row{display:flex;gap:.8em;margin-top:1em;flex-wrap:wrap;justify-content:center}
+  .btn{font:inherit;font-weight:700;font-size:1.1em;padding:.6em 1.3em;border:0;border-radius:.5em;cursor:pointer;
+    background:#f5c542;color:#3a2208;box-shadow:0 .2em 0 #a3771a}
+  .btn:active{transform:translateY(.1em);box-shadow:0 .1em 0 #a3771a}
+  .btn.big{font-size:1.35em;padding:.65em 1.6em}
+  .btn.alt{background:#e9dcc6;box-shadow:0 .2em 0 #9c8c72}
+  .btn.ad{background:#8e5bd9;color:#fff;box-shadow:0 .2em 0 #55318f}
+  .btn:disabled{opacity:.45;cursor:default}
+  #garage{display:flex;gap:1em}
+  .car{width:12.5em;padding:.9em;border-radius:.7em;background:rgba(0,0,0,.35);border:.15em solid transparent;text-align:left}
+  .car.sel{border-color:#f5c542;background:rgba(245,197,66,.12)}
+  .car .sw{height:2.2em;border-radius:.4em;margin-bottom:.5em;position:relative}
+  .car .sw:after{content:"";position:absolute;right:18%;top:22%;width:12%;height:56%;background:rgba(255,255,255,.8);border-radius:.15em}
+  .car b{font-size:1.1em}
+  .car p{margin:.3em 0 .5em;font-size:.8em;opacity:.8;min-height:2.4em}
+  .stat{display:flex;align-items:center;gap:.4em;font-size:.72em;margin:.15em 0}
+  .stat span{width:3.6em;opacity:.8}
+  .stat i{flex:1;height:.5em;background:rgba(255,255,255,.15);border-radius:1em;overflow:hidden}
+  .stat i em{display:block;height:100%;background:#f5c542}
+  .car .btn{width:100%;margin-top:.5em;font-size:.9em;padding:.45em}
+  #menuInfo{margin-top:.8em;font-size:1em;opacity:.9}
+  #cards{display:flex;gap:1em}
+  .card{font:inherit;color:#fff;width:13em;min-height:13em;padding:1em;border-radius:.8em;cursor:pointer;
+    background:linear-gradient(#3b2a18,#24180c);border:.15em solid #8a6a3a;display:flex;flex-direction:column;align-items:center;gap:.3em}
+  .card:hover{border-color:#f5c542;transform:translateY(-.15em)}
+  .card .ic{font-size:2.6em}
+  .card .nm{font-weight:800;font-size:1.15em}
+  .card .lv{font-size:.8em;color:#f5c542;font-weight:700;letter-spacing:.05em}
+  .card .ds{font-size:.9em;opacity:.85}
+  #overStats{font-size:1.15em;line-height:1.7}
+  #pauseBtn,#muteBtn{position:absolute;top:.9em;right:.9em;width:2.6em;height:2.6em;border-radius:.5em;border:0;font:inherit;font-weight:900;
+    background:rgba(0,0,0,.45);color:#fff;pointer-events:auto;cursor:pointer;z-index:5;padding:0}
+  #pauseBtn{right:4em;display:none}
+  #muteBtn{font-size:1.05em}
+  .adbox{background:#000;padding:2em 3em;border-radius:.6em;font-size:1.4em}
+  #adstub{z-index:10}
+  #rotate{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:#120d08;color:#f5c542;font-size:22px;font-weight:800;text-align:center;padding:24px}
+  #rotate .ph{font-size:64px;animation:spin 2.2s ease-in-out infinite}
+  @keyframes spin{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  @media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <button id="pauseBtn" aria-label="Pause">❚❚</button>
+    <button id="muteBtn" aria-label="Mute">🔊</button>
+
+    <div id="menu" class="screen show">
+      <h1>STEEL<br>COLOSSEUM</h1>
+      <p class="sub">Drift. Ram. Survive the arena.</p>
+      <div id="garage"></div>
+      <div class="row"><button id="playBtn" class="btn big">▶ ENTER THE ARENA</button></div>
+      <div id="menuInfo"></div>
+      <p class="hint">Steer: point with mouse · touch &amp; hold · WASD / arrows &nbsp;|&nbsp; Pause: P or Space &nbsp;|&nbsp; Mute: M</p>
+    </div>
+
+    <div id="levelup" class="screen">
+      <h2>LEVEL UP!</h2>
+      <div id="cards"></div>
+      <div class="row"><button id="rerollBtn" class="btn ad">🎬 Reroll choices</button></div>
+    </div>
+
+    <div id="pause" class="screen">
+      <h2>PAUSED</h2>
+      <div class="row">
+        <button id="resumeBtn" class="btn big">▶ Resume</button>
+        <button id="quitBtn" class="btn alt">Quit to garage</button>
+      </div>
+    </div>
+
+    <div id="over" class="screen">
+      <h2 id="overTitle">DEFEATED</h2>
+      <div id="overStats"></div>
+      <div class="row">
+        <button id="continueBtn" class="btn big">Continue</button>
+        <button id="reviveBtn" class="btn big ad">🎬 Revive</button>
+      </div>
+    </div>
+
+    <div id="adstub" class="screen"><div class="adbox">📺 An ad would play here<br><small>(test stub: no ad SDK loaded)</small></div></div>
+  </div>
+</div>
+<div id="rotate"><div class="ph">📱</div>Turn your phone sideways to play</div>
+<!-- SDK -->
+<script src="game.js"></script>
+</body>
+</html>
