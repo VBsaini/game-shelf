@@ -81,7 +81,7 @@ def copy_game(g):
 
 def card(g):
     e = html.escape
-    img = (f'<img src="{e(g["slug"])}/cover.jpg" alt="" width="800" height="470" loading="lazy">'
+    img = (f'<img src="{e(g["slug"])}/cover.jpg" alt="" width="800" height="470">'
            if g.get("has_cover") else f'<span class="nocover">{e(g["title"])}</span>')
     return f"""
     <a class="cart" href="{e(g["slug"])}/" style="--plastic:{e(g.get("color", "#5b6cff"))}">
