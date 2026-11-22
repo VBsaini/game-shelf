@@ -285,6 +285,7 @@ function setState(s, focusLoss) {
   $('pauseBtn').style.display = s === 'play' ? 'block' : 'none';
   $('pads').style.display = s === 'play' && touchUI ? 'block' : 'none';
   if (s === 'levels') renderLevels();
+  if (s === 'menu' && touchUI) { const k = document.querySelectorAll('.keepers kbd'); if (k.length === 2) { k[0].textContent = 'left pad'; k[1].textContent = 'right pad'; } }
   if (s === 'menu') { const n = Object.keys(done).length; $('menuInfo').textContent = n ? `${n} / ${LEVELS.length} levels lit` : `${LEVELS.length} dark places, two lanterns`; }
   Sound.music();
 }
@@ -431,7 +432,9 @@ function drawHUD(time) {
   hudText(`${li + 1}. ${LEVELS[li].name}`, OX, 26, 20, '#f3eaff', 'left', 900);
   hudText(`Moves ${moves}  ·  best possible ${par}`, OX + 360, 26, 15, '#b9addb', 'left', 700);
   for (const b of hudButtons()) { ctx.fillStyle = 'rgba(255,255,255,.1)'; rr(b.x, b.y, b.w, b.h, 8); ctx.fill(); hudText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1, 15, b.c || '#fff', 'center', 800, null); }
-  const text = msg ? msg.t : moves === 0 ? LEVELS[li].hint : '';
+  let hint = LEVELS[li].hint;
+  if (touchUI) hint = hint.replace('Amber moves with WASD, Teal with the arrow keys.', 'The left pad moves Amber, the right pad moves Teal.');
+  const text = msg ? msg.t : moves === 0 ? hint : '';
   if (msg) { msg.life -= 1 / 60; if (msg.life <= 0) msg = null; }
   if (text) {
     ctx.font = '700 17px system-ui'; const tw = ctx.measureText(text).width + 36;

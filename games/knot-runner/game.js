@@ -227,7 +227,7 @@ function newRun(seed) {
     p: { x: 220, y: H / 2, vx: 1, vy: 0 }, speed: 330, camX: 0, t: 0, dist: 0,
     anchor: null, dir: 1, posts: [], saws: [], coins: [], trail: [], genX: 420, combo: 0, coinsRun: 0,
     dead: null, revived: false, inv: 0, shake: 0, parts: [], texts: [], swingAngle: 0, rnd: seed || (Math.random() * 1e9) | 0,
-    tipT: 0, grabs: 0,
+    tipT: 0, grabs: 0, started: false,
   };
   pendingOver = false;
   holding = false;
@@ -321,7 +321,7 @@ function die(kind) {
   setTimeout(gameOver, 900);
 }
 function update(dt) {
-  if (!G) return;
+  if (!G || !G.started) return;          // nothing moves until the first touch
   G.t += dt;
   for (const q of G.parts) { q.t += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.94; q.vy *= 0.94; }
   G.parts = G.parts.filter(q => q.t < q.life);
@@ -536,8 +536,15 @@ function drawHUD(time) {
   hudText(String(score()), W / 2, 34, 34, '#fff', 'center', 900);
   hudText(Math.floor(G.dist / 10) + ' m', W / 2, 64, 15, '#c3c9e8', 'center', 700);
   hudText('🪙 ' + G.coinsRun, 24, 32, 22, '#ffd166', 'left', 900);
+  if (!G.started) {
+    ctx.fillStyle = 'rgba(5,6,15,.6)'; rr(W / 2 - 330, H / 2 - 70, 660, 140, 22); ctx.fill();
+    hudText('HOLD to swing round a post', W / 2, H / 2 - 28, 32, '#fff', 'center', 900);
+    hudText('LET GO to fly · don\'t cross your own rope', W / 2, H / 2 + 12, 20, '#ffd166', 'center', 800);
+    hudText('Tap or press Space to start', W / 2, H / 2 + 44, 16, '#c3c9e8', 'center', 700);
+    return;
+  }
   if (G.grabs < 2 && G.t < 12) {
-    const tip = G.t < 1.5 ? 'HOLD to swing round a post · LET GO to fly' : 'Don\'t run into your own rope or off the roof!';
+    const tip = G.t < 4 ? 'HOLD to swing round a post · LET GO to fly' : 'Don\'t run into your own rope or off the roof!';
     ctx.font = '700 19px system-ui'; const tw = ctx.measureText(tip).width + 40;
     ctx.fillStyle = 'rgba(5,6,15,.75)'; rr(W / 2 - tw / 2, H - 112, tw, 38, 19); ctx.fill();
     hudText(tip, W / 2, H - 93, 19, '#fff', 'center', 700);
@@ -547,13 +554,14 @@ function drawHUD(time) {
 // ---------------------------------------------------------------------
 //  Input: one button (mouse, touch or Space)
 // ---------------------------------------------------------------------
-canvas.addEventListener('pointerdown', e => { if (state === 'play' && !Platform.inAd) { holding = true; try { canvas.setPointerCapture(e.pointerId); } catch (err) { } } });
+canvas.addEventListener('pointerdown', e => { if (state === 'play' && !Platform.inAd) {
+  if (G && !G.started) { G.started = true; return; } holding = true; try { canvas.setPointerCapture(e.pointerId); } catch (err) { } } });
 canvas.addEventListener('pointerup', () => { holding = false; });
 canvas.addEventListener('pointercancel', () => { holding = false; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 window.addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
-  if (state === 'play' && !Platform.inAd && (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter')) holding = true;
+  if (state === 'play' && !Platform.inAd && (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter')) { if (G && !G.started) { if (!e.repeat) G.started = true; } else holding = true; }
   if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { if (state === 'play') pauseGame(); else if (state === 'paused') setState('play'); }
 });
 window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') holding = false; });
@@ -620,7 +628,7 @@ function frame(now) {
     },
     // a simple bot: looks ahead along its current path; grabs a post when danger is close, lets go when heading roughly right again
     bot(skill = 1) {
-      if (!G || G.dead) return;
+      if (!G || G.dead) return; G.started = true;
       const p = G.p, look = (0.32 + 0.25 * skill) * G.speed;
       const fx = p.x + p.vx * look, fy = p.y + p.vy * look;
       const danger = fy < EDGE + 40 || fy > H - EDGE - 40 || G.saws.some(s => Math.hypot(fx - s.x, fy - s.y) < s.r + 50) || p.vx < -0.2;
@@ -631,7 +639,7 @@ function frame(now) {
         holding = !(safe && d < 0.45 * skill + 0.15);
       } else holding = danger;
     },
-    sim(seconds, skill = 1) { const steps = Math.round(seconds / 0.01); for (let i = 0; i < steps && G && !G.dead; i++) { if (i % 3 === 0) this.bot(skill); update(0.01); } return G.dead ? G.dead.kind : 'alive'; },
+    sim(seconds, skill = 1) { if (G) G.started = true; const steps = Math.round(seconds / 0.01); for (let i = 0; i < steps && G && !G.dead; i++) { if (i % 3 === 0) this.bot(skill); update(0.01); } return G.dead ? G.dead.kind : 'alive'; },
     snap(w = 1920) {
       const vs = viewScale, d = dpr; viewScale = w / W; dpr = 1; canvas.width = w; canvas.height = Math.round(w * H / W);
       render(performance.now() / 1000); const url = canvas.toDataURL('image/png'); viewScale = vs; dpr = d; resize(); return url;

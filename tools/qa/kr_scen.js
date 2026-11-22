@@ -9,6 +9,9 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
   await p.goto(URL); await p.waitForTimeout(300);
   const scr = () => p.evaluate(() => (document.querySelector('.screen.show:not(#adstub)') || { id: 'none' }).id);
   await p.click('#playBtn'); await p.waitForTimeout(600);
+  ok(await p.evaluate(() => __kr.G.started === false && __kr.G.t === 0), 'a run waits for the first touch');
+  await p.keyboard.press('Space'); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => __kr.G.started && __kr.G.t > 0), 'pressing Space starts the run');
 
   // 1. crash, then pause straight away: the game-over screen must still come
   await p.evaluate(() => { __kr.G.p.vy = -1; __kr.G.p.vx = 0; });     // run straight off the roof
@@ -34,7 +37,7 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
   ok(after > before && await p.$eval('#doubleBtn', e => e.disabled), `double coins adds the run's coins again once (${before} -> ${after})`);
 
   // 3. quitting a run keeps the coins you picked up
-  await p.click('#againBtn'); await p.waitForTimeout(800);
+  await p.click('#againBtn'); await p.waitForTimeout(800); await p.keyboard.press('Space'); await p.waitForTimeout(100);
   const c1 = await p.evaluate(() => __kr.save.coins);
   await p.evaluate(() => { __kr.G.coinsRun = 7; });
   await p.keyboard.press('Escape'); await p.click('#quitBtn'); await p.waitForTimeout(200);
@@ -49,7 +52,7 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
   ok(await p.evaluate(() => __kr.save.best > 0), 'best score survives a reload');
 
   // 5. Space to swing; release lets go
-  await p.click('#playBtn'); await p.waitForTimeout(1500);
+  await p.click('#playBtn'); await p.waitForTimeout(300); await p.keyboard.press('Space'); await p.waitForTimeout(1200);
   await p.keyboard.down('Space'); await p.waitForTimeout(200);
   const grabbed = await p.evaluate(() => !!__kr.G.anchor);
   await p.keyboard.up('Space'); await p.waitForTimeout(80);
@@ -57,12 +60,14 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
 
   // 6. phone: touch and hold swings
   const m = await b.newContext({ ...devices['iPhone 13 landscape'] }); const q = await m.newPage(); q.on('pageerror', e => errs.push('phone: ' + e.message));
-  await q.goto(URL); await q.waitForTimeout(300); await q.tap('#playBtn'); await q.waitForTimeout(1500);
+  await q.goto(URL); await q.waitForTimeout(300); await q.tap('#playBtn'); await q.waitForTimeout(300);
   const cdp = await m.newCDPSession(q);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y: 200 }] }); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await q.waitForTimeout(1200);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y: 200 }] }); await q.waitForTimeout(250);
   const g2 = await q.evaluate(() => !!__kr.G.anchor);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await q.waitForTimeout(80);
   ok(g2 && await q.evaluate(() => !__kr.G.anchor), 'touch and hold swings on a phone');
+  ok(await q.evaluate(() => __kr.G.started), 'a tap starts the run on a phone');
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

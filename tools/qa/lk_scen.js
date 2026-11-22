@@ -61,6 +61,7 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
     return [...new Set(hits)];
   });
   ok(!overlap.length, 'd-pads never cover a start or exit tile (covered in levels: ' + overlap.join(',') + ')');
+  ok(!(await q.evaluate(() => document.querySelector('.keepers').textContent)).includes('W A S D'), 'the phone menu talks about pads, not keys');
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
