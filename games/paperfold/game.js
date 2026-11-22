@@ -153,7 +153,8 @@ const Platform = (() => {
 // ---------------------------------------------------------------------
 //  Canvas
 // ---------------------------------------------------------------------
-const canvas = $('game'), ctx = canvas.getContext('2d'), wrap = $('wrap');
+const canvas = $('game'), wrap = $('wrap');
+let ctx = canvas.getContext('2d');
 let viewScale = 1, dpr = 1;
 function resize() {
   viewScale = Math.min(window.innerWidth / W, window.innerHeight / H);
@@ -180,6 +181,7 @@ let cam = null;
 
 function loadLevel(i) {
   lvl = i; st = PF.parse(LEVELS[i]); st.WH = st.H * 0.75;
+  fadeLvl.clear();
   cur = PF.init(st); undoStack = []; moves = 0; anim = null; queued = null; hintMoves = null; msg = null; deathAnim = null;
   fold = foldTarget = 0;
   tex.width = st.S * CELL_W; tex.height = st.H * CELL_H;
@@ -673,11 +675,11 @@ function drawObjects(time, pl) {
   const redOn = PF.colorOn(st, cur, 0), blueOn = PF.colorOn(st, cur, 1);
   for (let y = 0; y < st.D; y++) for (let x = 0; x < st.W; x++) {
     const i = y * st.W + x, t = st.tiles[i];
-    if (t === '#') list.push({ y, x, f: () => cube(x, y, x + 1, y + 1, 0, 1, '#b7b2aa', '#9a958d', '#85807a') });
-    if (PF.EMIT[t]) list.push({ y, x, f: () => emitterAt(x, y, PF.EMIT[t], time) });
+    if (t === '#') list.push({ y, x, key: 'r' + i, box: [x, y, x + 1, y + 1, 1], f: () => cube(x, y, x + 1, y + 1, 0, 1, '#b7b2aa', '#9a958d', '#85807a') });
+    if (PF.EMIT[t]) list.push({ y, x, key: 'e' + i, box: [x + 0.08, y + 0.08, x + 0.92, y + 0.92, 0.75], f: () => emitterAt(x, y, PF.EMIT[t], time) });
     if ((t === 'A' || t === 'B') && PF.doorClosed(st, cur, i)) {
       const col = t === 'A' ? RED : BLUE;
-      list.push({ y, x, f: () => { ctx.globalAlpha = 0.85; cube(x + 0.04, y + 0.3, x + 0.96, y + 0.7, 0, 1.1, col, col, col, 'rgba(0,0,0,.45)'); ctx.globalAlpha = 1; } });
+      list.push({ y, x, key: 'd' + i, box: [x + 0.04, y + 0.3, x + 0.96, y + 0.7, 1.1], f: () => { ctx.globalAlpha = 0.85; cube(x + 0.04, y + 0.3, x + 0.96, y + 0.7, 0, 1.1, col, col, col, 'rgba(0,0,0,.45)'); ctx.globalAlpha = 1; } });
     }
     if (t === 'E') list.push({ y: y + 0.01, x, f: () => {
       const b = P(x + 0.5, y + 0.5, 0.75 + Math.sin(time * 2.5) * 0.08), s = Math.abs(P(x + 0.5, y + 0.5, 0)[1] - P(x + 0.5, y + 0.5, 0.4)[1]);
@@ -699,12 +701,12 @@ function drawObjects(time, pl) {
   };
   for (const list0 of PF.BOXES) for (const ci of cur[list0]) {
     const kind = PF.KIND[list0], x = ci % st.W, y = (ci / st.W) | 0, e = moving.get(ci);
-    if (e && e.t === 'push') { const [px, py] = along(e.path, anim.t < 0.999 ? ease(anim.t) : 1); list.push({ y: py, x: px, f: () => boxAt3(kind, px, py) }); }
+    if (e && e.t === 'push') { const [px, py] = along(e.path, anim.t < 0.999 ? ease(anim.t) : 1); list.push({ y: py, x: px, key: 'b' + ci, box: [px + 0.1, py + 0.1, px + 0.9, py + 0.9, 0.95], f: () => boxAt3(kind, px, py) }); }
     else if (e && e.t === 'ctele') {
       const k = anim.t, mx = e.mid % st.W, my = (e.mid / st.W) | 0;
       if (k < 0.5) { const [px, py] = along(e.path, k * 2); list.push({ y: my, x: mx, f: () => boxAt3(kind, px, py, 0, 1 - k) }); }
       else list.push({ y, x, f: () => boxAt3(kind, x, y, (1 - k) * 0.6, k) });
-    } else list.push({ y, x, f: () => boxAt3(kind, x, y) });
+    } else list.push({ y, x, key: 'b' + ci, box: [x + 0.1, y + 0.1, x + 0.9, y + 0.9, 0.95], f: () => boxAt3(kind, x, y) });
   }
   for (const [kk, e] of moving) if (e.t === 'fill') {
     const k = anim.t, tx = e.to % st.W, ty = (e.to / st.W) | 0, n = e.path.length, slideK = (n - 1) / n;
@@ -722,7 +724,18 @@ function drawObjects(time, pl) {
   if (pl) list.push({ y: pl.y + 0.02, x: pl.x, f: () => playerBillboard(pl.x, pl.y, pl.z || 0, cur.face, pl.a == null ? 1 : pl.a, pl.sq || 0) });
   const cx = st.W / 2 - 0.5;
   list.sort((a, b) => a.y - b.y || Math.abs(b.x - cx) - Math.abs(a.x - cx));
-  for (const o of list) o.f();
+  markHiders(list, pl);
+  for (const o of list) {
+    const a = o.key ? fadeNow(o.key, o.hides) : 1;
+    if (a > 0.99) { o.f(); continue; }
+    // draw the block on its own layer, then lay it down see-through
+    if (fadeCv.width !== canvas.width || fadeCv.height !== canvas.height) { fadeCv.width = canvas.width; fadeCv.height = canvas.height; }
+    const main = ctx; ctx = fadeCtx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, fadeCv.width, fadeCv.height);
+    ctx.setTransform(main.getTransform());
+    try { o.f(); } finally { ctx = main; }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = a; ctx.drawImage(fadeCv, 0, 0); ctx.restore();
+  }
   // hint arrow at the player's feet
   if (hintMoves && hintMoves.length && cur.m === 0 && !anim) {
     const d = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0] }[hintMoves[0]];
@@ -736,6 +749,54 @@ function beamSeg(x0, y0, x1, y1, time) {
   ctx.strokeStyle = `rgba(255,236,140,${0.28 + 0.08 * Math.sin(time * 6)})`; ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
   ctx.strokeStyle = '#fff6c8'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
   ctx.lineCap = 'butt';
+}
+// ---- see-through blocks ----
+// A block (stone, door, crate, emitter) that covers a plate, swirl pad,
+// sensor or the player turns see-through while it does.
+const fadeCv = document.createElement('canvas'), fadeCtx = fadeCv.getContext('2d');
+const fadeLvl = new Map();
+const FADE_MIN = 0.35, KEY_TILES = 'abTtVv12';   // the exit has its floating star, so it never needs revealing
+function fadeNow(key, hides) {
+  const target = hides ? FADE_MIN : 1, prev = fadeLvl.has(key) ? fadeLvl.get(key) : target;
+  const a = Math.abs(prev - target) < 0.02 ? target : lerp(prev, target, 0.18);
+  fadeLvl.set(key, a); return a;
+}
+function hull(pts) {
+  pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function inHull(h, p) {
+  for (let i = 0; i < h.length; i++) { const a = h[i], b = h[(i + 1) % h.length]; if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) < 0) return false; }
+  return true;
+}
+function keyTargets(pl) {
+  const out = [];
+  for (let i = 0; i < st.tiles.length; i++) {
+    if (!KEY_TILES.includes(st.tiles[i])) continue;
+    const x = i % st.W, y = (i / st.W) | 0;
+    out.push({ x, y, need: 2, pts: [[0.5, 0.5], [0.22, 0.22], [0.78, 0.22], [0.22, 0.78], [0.78, 0.78]].map(([u, v]) => P(x + u, y + v, 0)) });
+  }
+  if (pl && (pl.a == null || pl.a > 0.3)) out.push({ x: pl.x, y: pl.y + 0.02, need: 2, player: true, pts: [0.15, 0.5, 0.85].map(z => P(pl.x + 0.5, pl.y + 0.55, (pl.z || 0) + z)) });
+  return out;
+}
+function markHiders(list, pl) {
+  const targets = keyTargets(pl);
+  for (const o of list) {
+    if (!o.box) continue;
+    const [x0, y0, x1, y1, z1] = o.box, cs = [];
+    for (const xx of [x0, x1]) for (const yy of [y0, y1]) for (const zz of [0, z1]) cs.push(P(xx, yy, zz));
+    const h = hull(cs);
+    o.hides = targets.some(t => {
+      if (Math.abs(t.x - o.x) < 0.5 && Math.abs(t.y - o.y) < 0.5) return false;   // standing on it, not hiding it
+      if (t.player ? o.y <= t.y : o.y < t.y) return false;                          // behind it, drawn first
+      let n = 0; for (const p of t.pts) if (inHull(h, p)) n++;
+      return n >= t.need;
+    });
+  }
 }
 function arrow(a, b, col) {
   const an = Math.atan2(b[1] - a[1], b[0] - a[0]), l = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -938,6 +999,7 @@ function tick(dt) {
     // jump n moves into the solution (for screenshots)
     jump(n) { const sol = PF.solve(st, cur, 2000000); for (const m of sol.slice(0, n)) { cur = PF.step(st, cur, m).s; moves++; } anim = null; fold = foldTarget = cur.m; return cur.m; },
     set hideHud(v) { hideHud = v; },
+    get fades() { return [...fadeLvl].filter(([k, a]) => a < 1).map(([k]) => k); },
     snap(w = 1920) {
       const vs = viewScale, d = dpr; viewScale = w / W; dpr = 1; canvas.width = w; canvas.height = Math.round(w * H / W);
       render(performance.now() / 1000); const url = canvas.toDataURL('image/png'); viewScale = vs; dpr = d; resize(); return url;
