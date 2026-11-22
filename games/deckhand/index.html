@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Deckhand</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b2b45;overflow:hidden;color:#fff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  body{display:flex;align-items:center;justify-content:center}
+  #wrap{position:relative;font-size:16px}
+  canvas{display:block;touch-action:none}
+  #ui{position:absolute;inset:0;pointer-events:none}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,26,44,.86);pointer-events:auto;text-align:center}
+  .screen.show{display:flex}
+  h1{margin:0 0 .15em;font-size:4.2em;line-height:.95;letter-spacing:.05em;color:#ffcf6b;
+    text-shadow:0 .08em 0 #9a7420,0 .2em .45em rgba(0,0,0,.55)}
+  h2{margin:0 0 .5em;font-size:2.6em;color:#ffcf6b;text-shadow:0 .07em 0 #9a7420}
+  .sub{margin:0 0 1.3em;font-size:1.15em;opacity:.9;max-width:34em}
+  .hint{margin-top:1.2em;font-size:.85em;opacity:.65}
+  .row{display:flex;gap:.8em;margin-top:1em;flex-wrap:wrap;justify-content:center}
+  .btn{font:inherit;font-weight:700;font-size:1.1em;padding:.6em 1.3em;border:0;border-radius:.55em;cursor:pointer;
+    background:#ffcf6b;color:#2a1d05;box-shadow:0 .2em 0 #9a7420}
+  .btn:active{transform:translateY(.1em);box-shadow:0 .1em 0 #9a7420}
+  .btn.big{font-size:1.4em;padding:.65em 1.7em}
+  .btn.alt{background:#e9eef5;color:#22303f;box-shadow:0 .2em 0 #8b97a6}
+  .btn.ad{background:#8e5bd9;color:#fff;box-shadow:0 .2em 0 #55318f}
+  .btn:disabled{opacity:.4;cursor:default}
+  .corner{position:absolute;top:.7em;width:2.7em;height:2.7em;border-radius:.55em;border:0;font:inherit;font-weight:900;font-size:1em;
+    background:rgba(0,0,0,.4);color:#fff;pointer-events:auto;cursor:pointer;z-index:5;padding:0}
+  #muteBtn{right:.8em}
+  #pauseBtn{right:4.1em;display:none}
+  .stats{font-size:1.15em;line-height:1.7}
+  .adbox{background:#000;padding:2em 3em;border-radius:.6em;font-size:1.4em}
+  #adstub{z-index:10}
+  #rotate{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:#0b2b45;color:#ffcf6b;font-size:22px;font-weight:800;text-align:center;padding:24px}
+  #rotate .ph{font-size:64px;animation:spin 2.2s ease-in-out infinite}
+  @keyframes spin{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  @media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+  #rewards{display:flex;gap:1em;margin:.6em 0 .2em}
+  .rcard{font:inherit;position:relative;width:11em;min-height:15em;border:0;border-radius:.8em;padding:1em .8em;cursor:pointer;color:#1c2a3a;
+    background:linear-gradient(#d8e6f2,#9fb8cf);display:flex;flex-direction:column;align-items:center;gap:.35em;box-shadow:0 .25em 0 #2a3e52}
+  .rcard.order{background:linear-gradient(#f3e2bd,#d9bf8a);box-shadow:0 .25em 0 #6b5220}
+  .rcard:hover{transform:translateY(-.2em)}
+  .rcard i{font-style:normal;font-size:2.8em}
+  .rcard b{font-size:1.1em}
+  .rcard .st{font-weight:800;font-size:.9em}
+  .rcard small{line-height:1.35;opacity:.85}
+  .rcard .cost{position:absolute;left:.5em;top:.5em;width:1.7em;height:1.7em;border-radius:50%;background:#2f6fd1;color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center}
+  #how{display:none;max-width:40em;text-align:left;background:rgba(0,0,0,.3);border-radius:.8em;padding:.8em 1.2em;margin-top:1em;line-height:1.5;font-size:.92em}
+  #how.open{display:block}
+  #deckList{display:grid;grid-template-columns:repeat(3,15em);gap:.6em;max-height:30em;overflow-y:auto}
+  .dcard{background:rgba(255,255,255,.1);border-radius:.6em;padding:.5em .7em;text-align:left;display:grid;grid-template-columns:2.2em 1fr;gap:0 .4em}
+  .dcard i{font-style:normal;font-size:1.6em;grid-row:span 2}
+  .dcard small{opacity:.8;font-size:.8em}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <button id="pauseBtn" class="corner" aria-label="Pause">❚❚</button>
+    <button id="muteBtn" class="corner" aria-label="Mute">🔊</button>
+    <div id="menu" class="screen show">
+      <h1>DECKHAND</h1>
+      <p class="sub">Your deck is your crew. Put each sailor in the right place on the ship and sail through three seas of monsters.</p>
+      <div class="row"><button id="playBtn" class="btn big">⚓ SET SAIL</button><button id="howBtn" class="btn big alt">How to play</button></div>
+      <div id="how">Each turn you have <b>3 energy</b> and draw 4 cards. Tap a card, then a spot on the deck.<br>
+        <b>Crew stay on deck</b> and act every turn from stern to bow: Gunners fire properly only at the <b>cannons</b>, a Navigator at the <b>helm</b> gives +1 energy, Bosuns and Surgeons help the crew <b>next to them</b>.<br>
+        The monster's next move is shown above it. Most attacks hit whoever stands at the <b>bow</b> first; cannon shots hit the hull. If the hull reaches 0, your ship sinks.<br>
+        Keys: 1–8 pick a card, Q W E R pick a deck spot, Space ends the turn.</div>
+      <div id="menuInfo" class="stats" style="margin-top:1em"></div>
+    </div>
+    <div id="reward" class="screen">
+      <h2 id="rewardTitle">VICTORY!</h2>
+      <p id="rewardSub" class="sub"></p>
+      <div id="rewards"></div>
+      <div class="row"><button id="skipCard" class="btn alt">Skip</button></div>
+    </div>
+    <div id="deckview" class="screen">
+      <h2>YOUR DECK</h2>
+      <div id="deckList"></div>
+      <div class="row"><button id="deckBack" class="btn">◀ Back</button></div>
+    </div>
+    <div id="pause" class="screen">
+      <h2>PAUSED</h2>
+      <div class="row"><button id="resumeBtn" class="btn big">▶ Resume</button><button id="quitBtn" class="btn alt">Abandon voyage</button></div>
+    </div>
+    <div id="over" class="screen">
+      <h2 id="endTitle">YOUR SHIP SINKS</h2>
+      <div id="endStats" class="stats"></div>
+      <div class="row"><button id="reviveBtn" class="btn ad">🎬 Patch the hull</button></div>
+      <div class="row"><button id="againBtn" class="btn big">↺ New voyage</button><button id="menuBtn" class="btn alt">Menu</button></div>
+    </div>
+    <div id="adstub" class="screen"><div class="adbox">📺 An ad would play here<br><small>(test stub: no ad SDK loaded)</small></div></div>
+  </div>
+</div>
+<div id="rotate"><div class="ph">📱</div>Turn your phone sideways to play</div>
+<!-- SDK -->
+<script src="game.js"></script>
+</body>
+</html>

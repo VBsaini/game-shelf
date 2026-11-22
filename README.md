@@ -6,6 +6,12 @@ Games built for Poki and CrazyGames (ad revenue share). Each game lives in its o
 games/
   merge-bastion/       merge tower defense
   paperfold/           3D/2D portal puzzle
+  gravity-golf/        physics mini golf among planets
+  knot-runner/         one-button rooftop runner
+  tidepool-tycoon/     idle rock-pool tycoon
+  lantern-keepers/     two-player co-op lantern puzzle
+  word-forge/          word battler with letter tiles
+  deckhand/            card roguelite at sea
   steel-colosseum/     top-down car arena survivor
     index.html, game.js     the game
     build.py                makes dist/*.zip for each portal
@@ -21,12 +27,22 @@ games/
 | Steel Colosseum | Built; being playtested | `games/steel-colosseum` (port 8123) |
 | Merge Bastion | Built; bot-tested, needs playtest | `games/merge-bastion` (port 8125) |
 | Paperfold | Built; all 24 rooms solver-checked (13–24 add ice, rubber crates, lily pads, light beams), needs playtest | `games/paperfold` (port 8126) |
+| Gravity Golf | Built; all 18 holes solver-checked with par set by the solver, needs playtest | `games/gravity-golf` (port 8131) |
+| Knot Runner | Built; bot-tested, needs playtest | `games/knot-runner` (port 8132) |
+| Tidepool Tycoon | Built; economy bot-tested, needs playtest | `games/tidepool-tycoon` (port 8133) |
+| Lantern Keepers | Built; all 12 levels solver-checked, needs playtest (ideally with two people) | `games/lantern-keepers` (port 8134) |
+| Word Forge | Built; bot-tested, needs playtest | `games/word-forge` (port 8135) |
+| Deckhand | Built; bot-tested, needs playtest | `games/deckhand` (port 8136) |
 
 ## Game library website
 
 `python build_site.py` builds `site/`: a library page with a cartridge for every game, plus a playable copy of each game (no ad SDK, debug hooks removed, hidden from search engines). `python build_site.py --serve` builds it and serves it at http://localhost:8130.
 
 On GitHub, `.github/workflows/pages.yml` rebuilds and republishes the site to GitHub Pages on every push to `main`, so a new game appears on the shelf as soon as it is pushed. The page title and intro line are in `site.json`.
+
+## Tests
+
+`tools/qa/` has browser tests (scenario suites and a random-input fuzzer) for the six newer games; see its README.
 
 ## Adding a game
 
