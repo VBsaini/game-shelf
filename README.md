@@ -11,6 +11,7 @@ games/
   tidepool-tycoon/     idle rock-pool tycoon
   lantern-keepers/     two-player co-op lantern puzzle
   word-forge/          word battler with letter tiles
+  deckhand/            card roguelite at sea
   steel-colosseum/     top-down car arena survivor
     index.html, game.js     the game
     build.py                makes dist/*.zip for each portal
@@ -31,6 +32,7 @@ games/
 | Tidepool Tycoon | Built; economy bot-tested, needs playtest | `games/tidepool-tycoon` (port 8133) |
 | Lantern Keepers | Built; all 12 levels solver-checked, needs playtest (ideally with two people) | `games/lantern-keepers` (port 8134) |
 | Word Forge | Built; bot-tested, needs playtest | `games/word-forge` (port 8135) |
+| Deckhand | Built; bot-tested, needs playtest | `games/deckhand` (port 8136) |
 
 ## Game library website
 
