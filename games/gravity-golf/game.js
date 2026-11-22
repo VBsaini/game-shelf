@@ -93,11 +93,12 @@ const Sound = (() => {
 //  Platform / ads (Poki SDK, CrazyGames SDK v3, or a local test stub)
 // ---------------------------------------------------------------------
 const Platform = (() => {
-  let kind = 'none', playing = false;
+  let kind = 'none', playing = false, inAd = false;
   const poki = () => window.PokiSDK;
   const cg = () => window.CrazyGames && window.CrazyGames.SDK;
   return {
     get kind() { return kind; },
+    get inAd() { return inAd; },          // true while any ad is on screen: games ignore input then
     async init() {
       if (poki()) { kind = 'poki'; try { await poki().init(); } catch (e) { console.warn('Poki SDK init failed', e); } }
       else if (cg()) { kind = 'crazy'; try { await cg().init(); cg().game.loadingStart(); } catch (e) { console.warn('CrazyGames SDK init failed', e); } }
@@ -108,7 +109,8 @@ const Platform = (() => {
     happy() { try { if (kind === 'crazy') cg().game.happytime(); } catch (e) { } },
     commercialBreak() {
       return new Promise(res => {
-        const done = () => { Sound.duck(false); res(); };
+        inAd = true;
+        const done = () => { inAd = false; Sound.duck(false); res(); };
         try {
           if (kind === 'poki') poki().commercialBreak(() => Sound.duck(true)).then(done, done);
           else if (kind === 'crazy') cg().ad.requestAd('midgame', { adStarted: () => Sound.duck(true), adFinished: done, adError: done });
@@ -118,7 +120,8 @@ const Platform = (() => {
     },
     rewardedBreak() {
       return new Promise(res => {
-        const done = ok => { Sound.duck(false); res(ok); };
+        inAd = true;
+        const done = ok => { inAd = false; Sound.duck(false); res(ok); };
         Sound.duck(true);
         try {
           if (kind === 'poki') poki().rewardedBreak().then(ok => done(!!ok), () => done(false));
@@ -207,7 +210,7 @@ const totalStars = () => Object.keys(best).reduce((a, k) => a + starsOf(+k, best
 const unlocked = () => Math.min(HOLES.length - 1, Store.get('unlocked', 0));
 
 function loadHole(n) {
-  loadId++; hn = n; hole = HOLES[n]; T = 0; strokes = 0; flight = null; drag = null; msg = null; trail = []; parts = []; sunk = 0;
+  loadId++; pendingDone = false; hn = n; hole = HOLES[n]; T = 0; strokes = 0; flight = null; drag = null; msg = null; trail = []; parts = []; sunk = 0;
   ball = { x: hole.tee[0], y: hole.tee[1] }; shotStart = { ...ball };
   aim = { ang: Math.atan2(hole.cup[1] - ball.y, hole.cup[0] - ball.x), pow: 0.5, key: false };
   setState('play');
@@ -250,8 +253,10 @@ function scoreName(s, par) {
   const d = s - par;
   return d <= -2 ? 'EAGLE!' : d === -1 ? 'BIRDIE!' : d === 0 ? 'PAR' : d === 1 ? 'BOGEY' : d === 2 ? 'DOUBLE BOGEY' : '+' + d;
 }
+let pendingDone = false;
 function holeDone() {
-  if (state !== 'play') return;
+  if (state !== 'play') { pendingDone = true; return; }   // paused during the sink: finish when play resumes
+  pendingDone = false;
   const prev = best[hn], st = starsOf(hn, strokes);
   if (!prev || strokes < prev) { best[hn] = strokes; Store.set('best', best); }
   Store.set('unlocked', Math.max(Store.get('unlocked', 0), hn + 1));
@@ -291,6 +296,7 @@ function showMsg(t) { msg = { t, life: 2.4 }; }
 // ---------------------------------------------------------------------
 function setState(s, focusLoss) {
   state = s;
+  if (s === 'play' && pendingDone && hole && sunk) setTimeout(holeDone, 200);
   if (s === 'play') Platform.gameplayStart(); else if (!(focusLoss && Platform.kind === 'crazy')) Platform.gameplayStop();
   for (const el of document.querySelectorAll('.screen')) if (el.id !== 'adstub') el.classList.toggle('show', el.id === ({ menu: 'menu', holes: 'holes', paused: 'pause', done: 'done' }[s]));
   $('pauseBtn').style.display = s === 'play' ? 'block' : 'none';
@@ -418,7 +424,7 @@ function render(time) {
   drawCup(hole.cup[0], hole.cup[1], time);
   hole.bodies.forEach((b, i) => { const [x, y] = GP.bodyPos(b, Tn); drawPlanet(b, x, y, i + hn * 2, time); });
   // aim
-  if (state === 'play' && !flight && !sunk && aim && (drag || aim.key)) {
+  if (state === 'play' && !flight && !sunk && aim && ((drag && drag.moved) || aim.key)) {
     const p = previewPath(aim);
     let n = 0;
     for (let i = 0; i < p.length; i += 3) {
@@ -507,25 +513,26 @@ function tick(dt) {
 //  Input
 // ---------------------------------------------------------------------
 canvas.addEventListener('pointerdown', e => {
-  if (state !== 'play') return;
+  if (state !== 'play' || Platform.inAd) return;
   const p = toCanvas(e);
   for (const b of hudButtons()) if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { Sound.play('click'); if (b.id === 'restart') restartHole(); else buyGuide(); return; }
   if (flight || sunk) return;
-  drag = { x: p.x, y: p.y }; aim.key = false;
+  drag = { x: p.x, y: p.y, moved: false }; aim.key = false;
   try { canvas.setPointerCapture(e.pointerId); } catch (err) { }
 });
 canvas.addEventListener('pointermove', e => {
   if (!drag) return;
   const p = toCanvas(e), dx = drag.x - p.x, dy = drag.y - p.y, d = Math.hypot(dx, dy);
-  if (d > 6) { aim.ang = Math.atan2(dy, dx); aim.pow = clamp((d - 6) / 230, 0, 1); }
+  if (d > 6) { drag.moved = true; aim.ang = Math.atan2(dy, dx); aim.pow = clamp((d - 6) / 230, 0, 1); }
 });
-canvas.addEventListener('pointerup', () => { if (!drag) return; drag = null; if (aim.pow >= 0.04) shoot(aim); });
+canvas.addEventListener('pointerup', () => { if (!drag) return; const moved = drag.moved; drag = null; if (moved && aim.pow >= 0.04) shoot(aim); });
 canvas.addEventListener('pointercancel', () => { drag = null; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 const keys = {};
 window.addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
+  if (Platform.inAd) return;
   if (state === 'play') {
     if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat && !flight && !sunk && aim.key) shoot(aim);
     else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'KeyW', 'KeyS'].includes(e.code) && aim) aim.key = true;
@@ -535,7 +542,7 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 function keyAim(dt) {
-  if (state !== 'play' || flight || !aim || !aim.key) return;
+  if (state !== 'play' || flight || !aim || !aim.key || Platform.inAd) return;
   const fine = keys.ShiftLeft || keys.ShiftRight ? 0.25 : 1;
   if (keys.ArrowLeft || keys.KeyA) aim.ang -= 1.1 * dt * fine;
   if (keys.ArrowRight || keys.KeyD) aim.ang += 1.1 * dt * fine;

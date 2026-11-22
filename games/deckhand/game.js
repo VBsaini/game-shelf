@@ -93,11 +93,12 @@ const Sound = (() => {
 //  Platform / ads (Poki SDK, CrazyGames SDK v3, or a local test stub)
 // ---------------------------------------------------------------------
 const Platform = (() => {
-  let kind = 'none', playing = false;
+  let kind = 'none', playing = false, inAd = false;
   const poki = () => window.PokiSDK;
   const cg = () => window.CrazyGames && window.CrazyGames.SDK;
   return {
     get kind() { return kind; },
+    get inAd() { return inAd; },          // true while any ad is on screen: games ignore input then
     async init() {
       if (poki()) { kind = 'poki'; try { await poki().init(); } catch (e) { console.warn('Poki SDK init failed', e); } }
       else if (cg()) { kind = 'crazy'; try { await cg().init(); cg().game.loadingStart(); } catch (e) { console.warn('CrazyGames SDK init failed', e); } }
@@ -108,7 +109,8 @@ const Platform = (() => {
     happy() { try { if (kind === 'crazy') cg().game.happytime(); } catch (e) { } },
     commercialBreak() {
       return new Promise(res => {
-        const done = () => { Sound.duck(false); res(); };
+        inAd = true;
+        const done = () => { inAd = false; Sound.duck(false); res(); };
         try {
           if (kind === 'poki') poki().commercialBreak(() => Sound.duck(true)).then(done, done);
           else if (kind === 'crazy') cg().ad.requestAd('midgame', { adStarted: () => Sound.duck(true), adFinished: done, adError: done });
@@ -118,7 +120,8 @@ const Platform = (() => {
     },
     rewardedBreak() {
       return new Promise(res => {
-        const done = ok => { Sound.duck(false); res(ok); };
+        inAd = true;
+        const done = ok => { inAd = false; Sound.duck(false); res(ok); };
         Sound.duck(true);
         try {
           if (kind === 'poki') poki().rewardedBreak().then(ok => done(!!ok), () => done(false));
