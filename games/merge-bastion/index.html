@@ -44,7 +44,9 @@
   #summonBtn{left:50%;transform:translateX(-50%);bottom:1.1em;font-size:1.45em;padding:.55em 1.4em;min-width:9.5em}
   #summonBtn:active{transform:translateX(-50%) translateY(.1em)}
   #summonBtn small{display:block;font-size:.62em;opacity:.85;margin-top:.1em}
-  #giftBtn{left:calc(50% - 22em);bottom:1.6em;font-size:1em}
+  #giftBtn{right:7.6em;bottom:1.6em;font-size:1em}
+  #sumUpBtn{right:calc(50% + 8.6em);bottom:1.35em;font-size:1em;padding:.5em .9em;min-width:9em}
+  #sumUpBtn small{display:block;font-size:.8em;opacity:.85;margin-top:.1em}
   #speedBtn{right:2em;bottom:1.6em;font-size:1.1em;min-width:4.2em}
   .corner{position:absolute;top:.75em;right:.9em;width:2.6em;height:2.6em;border-radius:.5em;border:0;font:inherit;font-weight:900;
     background:rgba(0,0,0,.45);color:#fff;pointer-events:auto;cursor:pointer;z-index:5;padding:0}
@@ -68,7 +70,8 @@
 
     <div id="bar">
       <button id="giftBtn" class="btn ad">🎬 Free Lv 3 tower</button>
-      <button id="summonBtn" class="btn">SUMMON<small id="summonCost">🪙 10</small></button>
+      <button id="sumUpBtn" class="btn alt"><span id="sumUpLbl">⬆ Lv 2 summons</span><small id="sumUpCost">🪙 200</small></button>
+      <button id="summonBtn" class="btn"><span id="summonLbl">SUMMON</span><small id="summonCost">🪙 10</small></button>
       <button id="speedBtn" class="btn alt">▶ x1</button>
     </div>
 
@@ -80,7 +83,7 @@
         <button id="shopBtn" class="btn big alt">🔨 Workshop</button>
       </div>
       <div id="menuInfo"></div>
-      <p class="hint">Drag a tower onto an identical tower to merge it &nbsp;|&nbsp; Space: summon · F: speed · P: pause · M: mute</p>
+      <p class="hint">Drag a tower onto an identical one to merge it · fuse two different Lv 4 towers &nbsp;|&nbsp; Space: summon · U: better summons · F: speed · P: pause · M: mute</p>
     </div>
 
     <div id="shop" class="screen">
