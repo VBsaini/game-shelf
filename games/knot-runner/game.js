@@ -229,6 +229,7 @@ function newRun(seed) {
     dead: null, revived: false, inv: 0, shake: 0, parts: [], texts: [], swingAngle: 0, rnd: seed || (Math.random() * 1e9) | 0,
     tipT: 0, grabs: 0,
   };
+  pendingOver = false;
   holding = false;
   generate();
   setState('play');
@@ -373,6 +374,7 @@ const score = () => Math.floor(G.dist / 10) + G.combo;
 // ---------------------------------------------------------------------
 function setState(s, focusLoss) {
   state = s;
+  if (s === 'play' && pendingOver && G && G.dead) setTimeout(gameOver, 300);
   if (s === 'play') Platform.gameplayStart(); else if (!(focusLoss && Platform.kind === 'crazy')) Platform.gameplayStop();
   for (const el of document.querySelectorAll('.screen')) if (el.id !== 'adstub') el.classList.toggle('show', el.id === ({ menu: 'menu', shop: 'shop', paused: 'pause', over: 'over' }[s]));
   $('pauseBtn').style.display = s === 'play' ? 'block' : 'none';
@@ -380,8 +382,11 @@ function setState(s, focusLoss) {
   if (s === 'shop') renderShop();
   Sound.music(s === 'play' ? 2 : 1);
 }
+let pendingOver = false;
 function gameOver() {
-  if (!G || state !== 'play') return;
+  if (!G) return;
+  if (state !== 'play') { pendingOver = true; return; }    // paused just after crashing: show it when play resumes
+  pendingOver = false;
   const sc = score(), isBest = sc > save.best;
   if (isBest) { save.best = sc; Sound.play('best'); }
   save.coins += G.coinsRun; persist();
@@ -542,13 +547,13 @@ function drawHUD(time) {
 // ---------------------------------------------------------------------
 //  Input: one button (mouse, touch or Space)
 // ---------------------------------------------------------------------
-canvas.addEventListener('pointerdown', e => { if (state === 'play') { holding = true; try { canvas.setPointerCapture(e.pointerId); } catch (err) { } } });
+canvas.addEventListener('pointerdown', e => { if (state === 'play' && !Platform.inAd) { holding = true; try { canvas.setPointerCapture(e.pointerId); } catch (err) { } } });
 canvas.addEventListener('pointerup', () => { holding = false; });
 canvas.addEventListener('pointercancel', () => { holding = false; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 window.addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
-  if (state === 'play' && (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter')) holding = true;
+  if (state === 'play' && !Platform.inAd && (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter')) holding = true;
   if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { if (state === 'play') pauseGame(); else if (state === 'paused') setState('play'); }
 });
 window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') holding = false; });
@@ -562,7 +567,7 @@ $('shopBtn').onclick = () => setState('shop');
 $('shopBack').onclick = () => setState('menu');
 $('pauseBtn').onclick = () => pauseGame();
 $('resumeBtn').onclick = () => setState('play');
-$('quitBtn').onclick = () => { G = null; setState('menu'); };
+$('quitBtn').onclick = () => { if (G && !G.dead) { save.coins += G.coinsRun; persist(); } G = null; pendingOver = false; setState('menu'); };
 $('againBtn').onclick = () => { $('againBtn').disabled = true; Platform.commercialBreak().then(() => { $('againBtn').disabled = false; newRun(); }); };
 $('menuBtn').onclick = () => { G = null; setState('menu'); };
 $('reviveBtn').onclick = revive;
