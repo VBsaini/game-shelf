@@ -276,7 +276,9 @@ function offlineCapHours(E) { return 3 + 2 * (E.pups.nap || 0); }
 // ---------------------------------------------------------------------
 const SUFFIX = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
 function fmt(n) {
+  if (!isFinite(n)) return '∞';
   if (n < 1000) return n < 10 && n % 1 ? n.toFixed(1) : String(Math.floor(n));
+  if (n >= 1e36) { const ex = Math.floor(Math.log10(n)); return (n / Math.pow(10, ex)).toFixed(2) + 'e' + ex; }
   const e = Math.min(SUFFIX.length - 1, Math.floor(Math.log10(n) / 3));
   const v = n / Math.pow(1000, e);
   return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + SUFFIX[e];
@@ -630,7 +632,7 @@ function enterPool() {
   syncFish(); refreshPanel(true);
   if (away > 60 && E.earnedAll > 0) {
     const secs = Math.min(away, offlineCapHours(E) * 3600);
-    offlineGain = pps(E, E.last) * secs * 0.5;
+    offlineGain = pps(E, Infinity) * secs * 0.5;       // as if the 5-minute ad boost had run out: it never counts for hours away
     if (offlineGain >= 1) {
       earn(E, offlineGain);
       $('awayMsg').innerHTML = `You were away for <b>${fmtTime(away)}</b>.<br>Your creatures gathered <b>🫧 ${fmt(offlineGain)}</b>` + (away > secs ? `<br><small>(earnings stop after ${offlineCapHours(E)} h away)</small>` : '');
@@ -653,7 +655,7 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 window.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); if (state === 'play' && !e.repeat) tapPool(POOL.x + POOL.w / 2 + rand(-120, 120), POOL.y + POOL.h / 2 + rand(-80, 80)); }
-  if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { if (state === 'play') pauseGame(); else if (state === 'paused') setState('play'); }
+  if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { if (state === 'play') pauseGame(); else if (state === 'paused') enterPool(); }
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { persist(); pauseGame(true); } Sound.setHidden(document.hidden); });
 window.addEventListener('pagehide', persist);
@@ -662,7 +664,7 @@ setupMute();
 let firstPlay = true;
 $('playBtn').onclick = () => { if (firstPlay) { firstPlay = false; $('playBtn').disabled = true; Platform.commercialBreak().then(() => { $('playBtn').disabled = false; enterPool(); }); } else enterPool(); };
 $('pauseBtn').onclick = () => pauseGame();
-$('resumeBtn').onclick = () => setState('play');
+$('resumeBtn').onclick = () => enterPool();
 $('menuBtn').onclick = () => { persist(); setState('menu'); };
 $('awayOk').onclick = () => setState('play');
 $('awayDouble').onclick = () => Platform.rewardedBreak().then(ok => { if (!ok) return; earn(E, offlineGain); $('awayDouble').disabled = true; persist(); setState('play'); toast('Doubled! +' + fmt(offlineGain) + ' 🫧'); });
