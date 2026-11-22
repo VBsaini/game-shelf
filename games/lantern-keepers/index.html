@@ -51,11 +51,12 @@
   .keepers span{display:flex;flex-direction:column;align-items:center;gap:.3em}
   .keepers kbd{font:inherit;font-size:.85em;background:rgba(255,255,255,.12);border-radius:.35em;padding:.15em .5em}
   #pads{position:absolute;inset:0;pointer-events:none;display:none}
-  .pad{position:absolute;bottom:1em;width:9.6em;height:9.6em;pointer-events:none}
-  .pad button{position:absolute;width:3.2em;height:3.2em;border:0;border-radius:.6em;font-size:1.1em;font-weight:900;color:#fff;pointer-events:auto;opacity:.6}
-  .pad[data-who="0"]{left:1em}.pad[data-who="0"] button{background:#c06a1c}
-  .pad[data-who="1"]{right:1em}.pad[data-who="1"] button{background:#1f8f82}
-  .pad [data-d=U]{left:3.2em;top:0}.pad [data-d=D]{left:3.2em;top:6.4em}.pad [data-d=L]{left:0;top:3.2em}.pad [data-d=R]{left:6.4em;top:3.2em}
+  .pad{position:absolute;bottom:.5em;width:8.4em;height:8.4em;pointer-events:none}
+  .pad button{position:absolute;width:2.8em;height:2.8em;border:0;border-radius:.6em;font-size:1.1em;font-weight:900;color:#fff;pointer-events:auto;opacity:.45}
+  .pad button:active{opacity:.8}
+  .pad[data-who="0"]{left:.5em}.pad[data-who="0"] button{background:#c06a1c}
+  .pad[data-who="1"]{right:.5em}.pad[data-who="1"] button{background:#1f8f82}
+  .pad [data-d=U]{left:2.8em;top:0}.pad [data-d=D]{left:2.8em;top:5.6em}.pad [data-d=L]{left:0;top:2.8em}.pad [data-d=R]{left:5.6em;top:2.8em}
 </style>
 </head>
 <body>

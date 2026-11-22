@@ -218,7 +218,7 @@ function loadLevel(i) {
 function markSeen() { for (let y = 0; y < st.H; y++) for (let x = 0; x < st.W; x++) if (LK.lit(x, y, cur.p[0]) || LK.lit(x, y, cur.p[1])) seen[y * st.W + x] = 1; }
 
 function tryMove(who, dir) {
-  if (state !== 'play') return;
+  if (state !== 'play' || Platform.inAd) return;
   const r = LK.step(st, cur, who, dir);
   if (!r) {
     Sound.play('bump', 0.08); bump[who] = 0.18;
@@ -465,7 +465,7 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { delete held[e.code]; });
 window.addEventListener('blur', () => { for (const k in held) delete held[k]; });
 function keyRepeat(dt) {
-  if (state !== 'play') return;
+  if (state !== 'play' || Platform.inAd) return;
   for (const code in held) { const h = held[code]; h.t -= dt; if (h.t <= 0) { h.t = 0.13; tryMove(...KEYS[code]); } }
 }
 canvas.addEventListener('pointerdown', e => {
@@ -513,7 +513,7 @@ function frame(now) {
   requestAnimationFrame(t => { last = t; frame(t); });
   // DEBUG-START (removed from release builds by build.py)
   window.__lk = {
-    get state() { return state; }, get cur() { return cur; }, get moves() { return moves; }, loadLevel, tryMove, LK, LEVELS,
+    get state() { return state; }, get cur() { return cur; }, get hintMoves() { return hintMoves; }, get moves() { return moves; }, loadLevel, tryMove, LK, LEVELS,
     // play a level with the solver's moves through the real input path
     play(i) { loadLevel(i); const sol = LK.solve(st); for (const [w, d] of sol) tryMove(w, d); return LK.won(st, cur) ? 'won in ' + moves : 'NOT WON'; },
     jump(n) { const sol = LK.solve(st); for (const [w, d] of sol.slice(0, n)) tryMove(w, d); for (const k of [0, 1]) draw[k] = cur.p[k].slice(); },
