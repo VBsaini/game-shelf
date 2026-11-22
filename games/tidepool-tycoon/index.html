@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tidepool Tycoon</title>
+<style>
+  html,body{margin:0;height:100%;background:#0c3a42;overflow:hidden;color:#fff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  body{display:flex;align-items:center;justify-content:center}
+  #wrap{position:relative;font-size:16px}
+  canvas{display:block;touch-action:none}
+  #ui{position:absolute;inset:0;pointer-events:none}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,44,52,.84);pointer-events:auto;text-align:center}
+  .screen.show{display:flex}
+  h1{margin:0 0 .15em;font-size:4.2em;line-height:.95;letter-spacing:.05em;color:#ffd166;
+    text-shadow:0 .08em 0 #b0832a,0 .2em .45em rgba(0,0,0,.55)}
+  h2{margin:0 0 .5em;font-size:2.6em;color:#ffd166;text-shadow:0 .07em 0 #b0832a}
+  .sub{margin:0 0 1.3em;font-size:1.15em;opacity:.9;max-width:34em}
+  .hint{margin-top:1.2em;font-size:.85em;opacity:.65}
+  .row{display:flex;gap:.8em;margin-top:1em;flex-wrap:wrap;justify-content:center}
+  .btn{font:inherit;font-weight:700;font-size:1.1em;padding:.6em 1.3em;border:0;border-radius:.55em;cursor:pointer;
+    background:#ffd166;color:#2a1d05;box-shadow:0 .2em 0 #b0832a}
+  .btn:active{transform:translateY(.1em);box-shadow:0 .1em 0 #b0832a}
+  .btn.big{font-size:1.4em;padding:.65em 1.7em}
+  .btn.alt{background:#e9eef5;color:#22303f;box-shadow:0 .2em 0 #8b97a6}
+  .btn.ad{background:#8e5bd9;color:#fff;box-shadow:0 .2em 0 #55318f}
+  .btn:disabled{opacity:.4;cursor:default}
+  .corner{position:absolute;top:.7em;width:2.7em;height:2.7em;border-radius:.55em;border:0;font:inherit;font-weight:900;font-size:1em;
+    background:rgba(0,0,0,.4);color:#fff;pointer-events:auto;cursor:pointer;z-index:5;padding:0}
+  #muteBtn{right:.8em}
+  #pauseBtn{right:4.1em;display:none}
+  .stats{font-size:1.15em;line-height:1.7}
+  .adbox{background:#000;padding:2em 3em;border-radius:.6em;font-size:1.4em}
+  #adstub{z-index:10}
+  #rotate{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:#0c3a42;color:#ffd166;font-size:22px;font-weight:800;text-align:center;padding:24px}
+  #rotate .ph{font-size:64px;animation:spin 2.2s ease-in-out infinite}
+  @keyframes spin{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  @media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+  #muteBtn{right:auto;left:.8em;top:auto;bottom:.7em}
+  #pauseBtn{right:auto;left:4.1em;top:auto;bottom:.7em}
+  #panel{position:absolute;left:48.6em;top:.9em;width:30.6em;height:43.2em;display:none;flex-direction:column;gap:.5em;pointer-events:auto;
+    background:rgba(12,58,66,.88);border-radius:1em;padding:.8em;box-sizing:border-box}
+  .tabs{display:flex;gap:.4em}
+  .tabs button,.amts button{flex:1;font:inherit;font-weight:800;border:0;border-radius:.5em;padding:.55em 0;cursor:pointer;background:rgba(255,255,255,.1);color:#d7f7f1}
+  .tabs button.on,.amts button.on{background:#ffd166;color:#3a2a05}
+  .amts{display:flex;gap:.4em;font-size:.8em}
+  #list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:.45em;padding-right:.2em}
+  #list::-webkit-scrollbar{width:.4em}#list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:1em}
+  .item{font:inherit;display:flex;align-items:center;gap:.6em;text-align:left;border:0;border-radius:.7em;padding:.45em .6em;cursor:pointer;
+    background:rgba(255,255,255,.1);color:#fff;flex-shrink:0}
+  .item:active{transform:scale(.98)}
+  .item canvas{width:3.3em;height:3.3em;flex-shrink:0}
+  .item .ic{font-size:1.8em;width:1.7em;text-align:center}
+  .item .t{flex:1;display:flex;flex-direction:column;gap:.1em}
+  .item .t small{opacity:.8;font-size:.78em}
+  .item .t small.m{color:#ffd166;opacity:.9}
+  .item .r{display:flex;flex-direction:column;align-items:flex-end;gap:.15em}
+  .item .n{font-size:1.5em;font-weight:900;opacity:.9}
+  .item .cost{font-weight:800;font-size:.9em;color:#ffe9a8;white-space:nowrap}
+  .item.poor{opacity:.5}
+  .item.owned{opacity:.55;cursor:default}
+  .phead{font-size:.9em;padding:.3em .2em .5em;opacity:.95}
+  #tideBtn,#boostBtn{font:inherit;font-weight:900;border:0;border-radius:.7em;padding:.55em;cursor:pointer;color:#fff}
+  #tideBtn{background:linear-gradient(#3cb6e0,#1c7fb0);box-shadow:0 .18em 0 #0d4f70;font-size:1.1em}
+  #tideBtn small{display:block;font-size:.65em;opacity:.9;font-weight:700}
+  #tideBtn:disabled{opacity:.5;cursor:default}
+  #boostBtn{background:#8e5bd9;box-shadow:0 .18em 0 #55318f;font-size:.9em}
+  .bottom{display:flex;flex-direction:column;gap:.45em}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <button id="pauseBtn" class="corner" aria-label="Pause">❚❚</button>
+    <button id="muteBtn" class="corner" aria-label="Mute">🔊</button>
+    <div id="panel">
+      <div class="tabs"><button id="tab_creatures">🐚 Creatures</button><button id="tab_upgrades">⭐ Upgrades</button><button id="tab_pearls">🦪 Pearls</button></div>
+      <div class="amts" id="amts"><button class="amt" data-n="1">×1</button><button class="amt" data-n="10">×10</button><button class="amt" data-n="max">Max</button></div>
+      <div id="list"></div>
+      <div class="bottom"><button id="boostBtn">🎬 ×2 for 5 min</button><button id="tideBtn">🌊 High tide</button></div>
+    </div>
+    <div id="menu" class="screen show">
+      <h1>TIDEPOOL<br>TYCOON</h1>
+      <p class="sub">Tap a little rock pool, fill it with creatures that gather plankton for you, and let the tide in for pearls.</p>
+      <div class="row"><button id="playBtn" class="btn big">▶ PLAY</button></div>
+      <div id="menuInfo" class="stats" style="margin-top:1em"></div>
+      <p class="hint">Your pool keeps earning while you're away · Space taps · P pause · M mute</p>
+    </div>
+    <div id="pause" class="screen">
+      <h2>PAUSED</h2>
+      <div class="row"><button id="resumeBtn" class="btn big">▶ Resume</button><button id="menuBtn" class="btn alt">Menu</button></div>
+    </div>
+    <div id="away" class="screen">
+      <h2>WELCOME BACK!</h2>
+      <div id="awayMsg" class="stats"></div>
+      <div class="row"><button id="awayDouble" class="btn ad">🎬 Double it</button><button id="awayOk" class="btn big">Collect</button></div>
+    </div>
+    <div id="tide" class="screen">
+      <h2>🌊 LET THE TIDE IN?</h2>
+      <div id="tideMsg" class="stats"></div>
+      <p class="sub" style="margin-top:.8em">Your plankton, creatures and upgrades wash away. Pearl upgrades stay forever.</p>
+      <div class="row"><button id="tideYes" class="btn big">🌊 High tide!</button><button id="tideNo" class="btn alt">Not yet</button></div>
+    </div>
+    <div id="adstub" class="screen"><div class="adbox">📺 An ad would play here<br><small>(test stub: no ad SDK loaded)</small></div></div>
+  </div>
+</div>
+<div id="rotate"><div class="ph">📱</div>Turn your phone sideways to play</div>
+<!-- SDK -->
+<script src="game.js"></script>
+</body>
+</html>

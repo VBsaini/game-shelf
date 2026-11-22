@@ -8,6 +8,7 @@ games/
   paperfold/           3D/2D portal puzzle
   gravity-golf/        physics mini golf among planets
   knot-runner/         one-button rooftop runner
+  tidepool-tycoon/     idle rock-pool tycoon
   steel-colosseum/     top-down car arena survivor
     index.html, game.js     the game
     build.py                makes dist/*.zip for each portal
@@ -25,6 +26,7 @@ games/
 | Paperfold | Built; all 24 rooms solver-checked (13–24 add ice, rubber crates, lily pads, light beams), needs playtest | `games/paperfold` (port 8126) |
 | Gravity Golf | Built; all 18 holes solver-checked with par set by the solver, needs playtest | `games/gravity-golf` (port 8131) |
 | Knot Runner | Built; bot-tested, needs playtest | `games/knot-runner` (port 8132) |
+| Tidepool Tycoon | Built; economy bot-tested, needs playtest | `games/tidepool-tycoon` (port 8133) |
 
 ## Game library website
 
