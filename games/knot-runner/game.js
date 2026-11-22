@@ -384,7 +384,7 @@ function setState(s, focusLoss) {
 }
 let pendingOver = false;
 function gameOver() {
-  if (!G) return;
+  if (!G || !G.dead) return;                               // a newer run has started: nothing to show
   if (state !== 'play') { pendingOver = true; return; }    // paused just after crashing: show it when play resumes
   pendingOver = false;
   const sc = score(), isBest = sc > save.best;

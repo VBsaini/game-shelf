@@ -40,6 +40,10 @@ games/
 
 On GitHub, `.github/workflows/pages.yml` rebuilds and republishes the site to GitHub Pages on every push to `main`, so a new game appears on the shelf as soon as it is pushed. The page title and intro line are in `site.json`.
 
+## Tests
+
+`tools/qa/` has browser tests (scenario suites and a random-input fuzzer) for the six newer games; see its README.
+
 ## Adding a game
 
 Make `games/<name>/` with the same layout: `index.html`, `game.js`, `build.py`, `make_thumbnails.py`, `README.md`, and a `game.json` (title, blurb, genre, cartridge colour, cover image, shelf order; see the top of `build_site.py`). Run `python build_site.py` to see it on the shelf.

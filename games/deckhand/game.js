@@ -378,7 +378,8 @@ const SLOT_X = [240, 400, 560, 720], SLOT_Y = 300, CW = 118, CH = 150;      // c
 function handRect(i, n) { const w = 120, h = 168, gap = Math.min(128, 760 / Math.max(1, n)), x0 = 640 - (gap * (n - 1) + w) / 2; return { x: x0 + i * gap, y: 538, w, h }; }
 const END_BTN = { x: 1080, y: 600, w: 170, h: 70 };
 
-function startRun(seed) { R = newRun(seed); selHand = -1; fx = []; floaters = []; setState('play'); toast(SEAS[0] + ': a ' + R.mon.name + '!'); }
+let runId = 0;
+function startRun(seed) { runId++; busy = false; R = newRun(seed); selHand = -1; fx = []; floaters = []; setState('play'); toast(SEAS[0] + ': a ' + R.mon.name + '!'); }
 function tryPlay(h, s) {
   if (busy || state !== 'play') return;
   const id = R.hand[h], C = CARDS[id];
@@ -391,6 +392,7 @@ function tryPlay(h, s) {
 function doEndTurn() { if (busy || state !== 'play') return; selHand = -1; animate(endTurn(R)); }
 function animate(ev) {
   busy = true; let t = 0;
+  const id = runId, setTimeout = (f, ms) => window.setTimeout(() => { if (id === runId && R) f(); }, ms);   // timers from an ended voyage do nothing
   const later = (dt, f) => { setTimeout(f, (t + dt) * 1000); };
   for (const e of ev) {
     if (e.t === 'atk') { later(0, () => { Sound.play(R && CARDS[(R.slots[e.s] || {}).id] && (e.s === 1 || e.s === 2) ? 'cannon' : 'hit'); fx.push({ k: 'shot', s: e.s, t: 0 }); }); later(0.25, () => { monHit = 0.2; floaters.push({ x: 1010, y: 190, s: '-' + e.dmg, c: '#ffd34d', t: 0 }); }); t += 0.32; }
@@ -416,14 +418,14 @@ function winFight() {
   if (R.fight >= MONSTERS.length) { save.wins++; Store.set('wins', save.wins); showEnd(true); return; }
   $('rewardTitle').textContent = beaten + ' defeated!';
   $('rewardSub').textContent = (R.fight % 3 === 0 ? `${SEAS[R.fight / 3 - 1]} conquered! Half your hull is repaired. ` : 'Hull +6. ') + 'Take a new card into your deck:';
-  const box = $('rewards'); box.innerHTML = '';
+  const box = $('rewards'); box.innerHTML = ''; delete box.dataset.done;
   for (const id of rewardChoices(R)) {
     const C = CARDS[id], d = document.createElement('button'); d.className = 'rcard' + (C.order ? ' order' : '');
     d.innerHTML = `<span class="cost">${C.cost}</span><i>${C.icon}</i><b>${C.name}</b>${C.crew ? `<span class="st">⚔${C.atk} ❤${C.hp}</span>` : ''}<small>${C.text}</small>`;
-    d.onclick = () => { R.deck.push(id); Sound.play('card'); nextFight(); };
+    d.onclick = () => { if (box.dataset.done) return; box.dataset.done = '1'; R.deck.push(id); Sound.play('card'); nextFight(); };
     box.appendChild(d);
   }
-  $('skipCard').onclick = () => nextFight();
+  $('skipCard').onclick = () => { if (box.dataset.done) return; box.dataset.done = '1'; nextFight(); };
   setState('reward');
 }
 function nextFight() {
@@ -586,7 +588,7 @@ function render(time) {
 // ---------------------------------------------------------------------
 const inR = (p, b) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
 canvas.addEventListener('pointerdown', e => {
-  if (state !== 'play' || !R) return;
+  if (state !== 'play' || !R || Platform.inAd) return;
   const p = toCanvas(e);
   if (inR(p, END_BTN)) { Sound.play('click'); doEndTurn(); return; }
   if (inR(p, { x: END_BTN.x, y: END_BTN.y - 36, w: END_BTN.w, h: 28 })) { showDeck(); return; }
@@ -606,7 +608,7 @@ canvas.addEventListener('pointerdown', e => {
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 window.addEventListener('keydown', e => {
-  if (state === 'play' && R && !busy) {
+  if (state === 'play' && R && !busy && !Platform.inAd) {
     if (/^Digit[1-8]$/.test(e.code)) { const i = +e.code[5] - 1; if (i < R.hand.length) { if (selHand === i && CARDS[R.hand[i]].order) tryPlay(i, null); else { selHand = i; Sound.play('card'); } } }
     if (['KeyQ', 'KeyW', 'KeyE', 'KeyR'].includes(e.code) && selHand >= 0 && CARDS[R.hand[selHand]].crew) tryPlay(selHand, ['KeyQ', 'KeyW', 'KeyE', 'KeyR'].indexOf(e.code));
     if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); doEndTurn(); }
@@ -626,10 +628,10 @@ $('playBtn').onclick = () => { if (firstPlay) { firstPlay = false; $('playBtn').
 $('howBtn').onclick = () => $('how').classList.toggle('open');
 $('pauseBtn').onclick = () => pauseGame();
 $('resumeBtn').onclick = () => setState('play');
-$('quitBtn').onclick = () => { R = null; setState('menu'); };
+$('quitBtn').onclick = () => { runId++; busy = false; R = null; setState('menu'); };
 $('deckBack').onclick = () => setState('play');
 $('againBtn').onclick = () => { $('againBtn').disabled = true; Platform.commercialBreak().then(() => { $('againBtn').disabled = false; startRun(); }); };
-$('menuBtn').onclick = () => { R = null; setState('menu'); };
+$('menuBtn').onclick = () => { runId++; busy = false; R = null; setState('menu'); };
 $('reviveBtn').onclick = revive;
 const portraitMQ = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
 if (portraitMQ.addEventListener) portraitMQ.addEventListener('change', () => { if (portraitMQ.matches) pauseGame(); });
