@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Lantern Keepers</title>
+<style>
+  html,body{margin:0;height:100%;background:#06050d;overflow:hidden;color:#fff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  body{display:flex;align-items:center;justify-content:center}
+  #wrap{position:relative;font-size:16px}
+  canvas{display:block;touch-action:none}
+  #ui{position:absolute;inset:0;pointer-events:none}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,6,18,.84);pointer-events:auto;text-align:center}
+  .screen.show{display:flex}
+  h1{margin:0 0 .15em;font-size:4.2em;line-height:.95;letter-spacing:.05em;color:#ffcf7a;
+    text-shadow:0 .08em 0 #a3741f,0 .2em .45em rgba(0,0,0,.55)}
+  h2{margin:0 0 .5em;font-size:2.6em;color:#ffcf7a;text-shadow:0 .07em 0 #a3741f}
+  .sub{margin:0 0 1.3em;font-size:1.15em;opacity:.9;max-width:34em}
+  .hint{margin-top:1.2em;font-size:.85em;opacity:.65}
+  .row{display:flex;gap:.8em;margin-top:1em;flex-wrap:wrap;justify-content:center}
+  .btn{font:inherit;font-weight:700;font-size:1.1em;padding:.6em 1.3em;border:0;border-radius:.55em;cursor:pointer;
+    background:#ffcf7a;color:#2a1d05;box-shadow:0 .2em 0 #a3741f}
+  .btn:active{transform:translateY(.1em);box-shadow:0 .1em 0 #a3741f}
+  .btn.big{font-size:1.4em;padding:.65em 1.7em}
+  .btn.alt{background:#e9eef5;color:#22303f;box-shadow:0 .2em 0 #8b97a6}
+  .btn.ad{background:#8e5bd9;color:#fff;box-shadow:0 .2em 0 #55318f}
+  .btn:disabled{opacity:.4;cursor:default}
+  .corner{position:absolute;top:.7em;width:2.7em;height:2.7em;border-radius:.55em;border:0;font:inherit;font-weight:900;font-size:1em;
+    background:rgba(0,0,0,.4);color:#fff;pointer-events:auto;cursor:pointer;z-index:5;padding:0}
+  #muteBtn{right:.8em}
+  #pauseBtn{right:4.1em;display:none}
+  .stats{font-size:1.15em;line-height:1.7}
+  .adbox{background:#000;padding:2em 3em;border-radius:.6em;font-size:1.4em}
+  #adstub{z-index:10}
+  #rotate{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:#06050d;color:#ffcf7a;font-size:22px;font-weight:800;text-align:center;padding:24px}
+  #rotate .ph{font-size:64px;animation:spin 2.2s ease-in-out infinite}
+  @keyframes spin{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  @media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+  #grid{display:grid;grid-template-columns:repeat(6,5.6em);gap:.7em}
+  .lvl{font:inherit;font-weight:900;font-size:1.25em;height:3.5em;border:0;border-radius:.6em;cursor:pointer;background:#2a2442;color:#f3eaff;box-shadow:0 .18em 0 #120f22;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05em}
+  .lvl small{font-size:.5em;font-weight:700;opacity:.85}
+  .lvl.done small{color:#ffd166;font-size:.6em}
+  .lvl:disabled{opacity:.3;cursor:default}
+  #stars{font-size:3em;letter-spacing:.1em;margin:.1em 0 .3em;color:#ffd166;text-shadow:0 .06em 0 #9a6b10}
+  #stars .off{color:#3a3358;text-shadow:none}
+  .keepers{display:flex;gap:2.2em;justify-content:center;margin:.2em 0 1em;font-weight:800}
+  .keepers span{display:flex;flex-direction:column;align-items:center;gap:.3em}
+  .keepers kbd{font:inherit;font-size:.85em;background:rgba(255,255,255,.12);border-radius:.35em;padding:.15em .5em}
+  #pads{position:absolute;inset:0;pointer-events:none;display:none}
+  .pad{position:absolute;bottom:1em;width:9.6em;height:9.6em;pointer-events:none}
+  .pad button{position:absolute;width:3.2em;height:3.2em;border:0;border-radius:.6em;font-size:1.1em;font-weight:900;color:#fff;pointer-events:auto;opacity:.6}
+  .pad[data-who="0"]{left:1em}.pad[data-who="0"] button{background:#c06a1c}
+  .pad[data-who="1"]{right:1em}.pad[data-who="1"] button{background:#1f8f82}
+  .pad [data-d=U]{left:3.2em;top:0}.pad [data-d=D]{left:3.2em;top:6.4em}.pad [data-d=L]{left:0;top:3.2em}.pad [data-d=R]{left:6.4em;top:3.2em}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="ui">
+    <button id="pauseBtn" class="corner" aria-label="Pause">❚❚</button>
+    <button id="muteBtn" class="corner" aria-label="Mute">🔊</button>
+    <div id="pads"><div class="pad" data-who="0"><button data-d="U">▲</button><button data-d="L">◀</button><button data-d="R">▶</button><button data-d="D">▼</button></div>
+      <div class="pad" data-who="1"><button data-d="U">▲</button><button data-d="L">◀</button><button data-d="R">▶</button><button data-d="D">▼</button></div></div>
+    <div id="menu" class="screen show">
+      <h1>LANTERN<br>KEEPERS</h1>
+      <p class="sub">Two keepers, two lanterns, one dark maze. Some paths only appear where your lights meet.</p>
+      <div class="keepers"><span style="color:#ffb347">🏮 Amber<kbd>W A S D</kbd></span><span style="color:#4fe3d0">🏮 Teal<kbd>← ↑ → ↓</kbd></span></div>
+      <div class="row"><button id="playBtn" class="btn big">▶ PLAY</button></div>
+      <div id="menuInfo" class="hint" style="opacity:.9;font-size:1em"></div>
+      <p class="hint">Play with a friend on one keyboard, or steer both yourself · Z undo · R retry · P pause · M mute</p>
+    </div>
+    <div id="levels" class="screen">
+      <h2>CHOOSE A LEVEL</h2>
+      <div id="grid"></div>
+      <div class="row"><button id="levelsBack" class="btn alt">◀ Back</button></div>
+    </div>
+    <div id="pause" class="screen">
+      <h2>PAUSED</h2>
+      <div class="row"><button id="resumeBtn" class="btn big">▶ Resume</button></div>
+      <div class="row"><button id="restartBtn" class="btn alt">↺ Retry</button><button id="skipBtn" class="btn ad">🎬 Skip level</button><button id="toLevels" class="btn alt">☰ Levels</button></div>
+    </div>
+    <div id="win" class="screen">
+      <h2 id="winTitle">LIGHT FOUND!</h2>
+      <div id="stars"></div>
+      <div id="winStats" class="stats"></div>
+      <div class="row"><button id="retryBtn" class="btn alt">↺ Again</button><button id="nextBtn" class="btn big">Next ▶</button></div>
+    </div>
+    <div id="adstub" class="screen"><div class="adbox">📺 An ad would play here<br><small>(test stub: no ad SDK loaded)</small></div></div>
+  </div>
+</div>
+<div id="rotate"><div class="ph">📱</div>Turn your phone sideways to play</div>
+<!-- SDK -->
+<script src="logic.js"></script>
+<script src="levels.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

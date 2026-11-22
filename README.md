@@ -9,6 +9,7 @@ games/
   gravity-golf/        physics mini golf among planets
   knot-runner/         one-button rooftop runner
   tidepool-tycoon/     idle rock-pool tycoon
+  lantern-keepers/     two-player co-op lantern puzzle
   steel-colosseum/     top-down car arena survivor
     index.html, game.js     the game
     build.py                makes dist/*.zip for each portal
@@ -27,6 +28,7 @@ games/
 | Gravity Golf | Built; all 18 holes solver-checked with par set by the solver, needs playtest | `games/gravity-golf` (port 8131) |
 | Knot Runner | Built; bot-tested, needs playtest | `games/knot-runner` (port 8132) |
 | Tidepool Tycoon | Built; economy bot-tested, needs playtest | `games/tidepool-tycoon` (port 8133) |
+| Lantern Keepers | Built; all 12 levels solver-checked, needs playtest (ideally with two people) | `games/lantern-keepers` (port 8134) |
 
 ## Game library website
 
