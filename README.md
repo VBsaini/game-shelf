@@ -6,6 +6,7 @@ Games built for Poki and CrazyGames (ad revenue share). Each game lives in its o
 games/
   merge-bastion/       merge tower defense
   paperfold/           3D/2D portal puzzle
+  gravity-golf/        physics mini golf among planets
   steel-colosseum/     top-down car arena survivor
     index.html, game.js     the game
     build.py                makes dist/*.zip for each portal
@@ -21,6 +22,7 @@ games/
 | Steel Colosseum | Built; being playtested | `games/steel-colosseum` (port 8123) |
 | Merge Bastion | Built; bot-tested, needs playtest | `games/merge-bastion` (port 8125) |
 | Paperfold | Built; all 24 rooms solver-checked (13–24 add ice, rubber crates, lily pads, light beams), needs playtest | `games/paperfold` (port 8126) |
+| Gravity Golf | Built; all 18 holes solver-checked with par set by the solver, needs playtest | `games/gravity-golf` (port 8131) |
 
 ## Game library website
 
