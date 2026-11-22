@@ -20,7 +20,7 @@ games/
 |------|--------|--------|
 | Steel Colosseum | Built; being playtested | `games/steel-colosseum` (port 8123) |
 | Merge Bastion | Built; bot-tested, needs playtest | `games/merge-bastion` (port 8125) |
-| Paperfold | Built; all 12 rooms solver-checked, needs playtest | `games/paperfold` (port 8126) |
+| Paperfold | Built; all 24 rooms solver-checked (13–24 add ice, rubber crates, lily pads, light beams), needs playtest | `games/paperfold` (port 8126) |
 
 ## Game library website
 

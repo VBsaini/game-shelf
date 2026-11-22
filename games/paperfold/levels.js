@@ -200,6 +200,211 @@ const LEVELS = [
       'L O      r      O',
     ],
   },
+  // ---------------- Ice ----------------
+  {
+    name: 'Thin Ice',
+    hint: 'Ice is slippery: you slide until something stops you.',
+    floor: [
+      '~~#~~E',
+      '~~~~#~',
+      '~~~~~#',
+      '~~~~~#',
+      'P#~~~~',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '                ',
+    ],
+  },
+  {
+    name: 'Curling',
+    hint: 'Crates slide on ice too. Plain floor stops them.',
+    floor: [
+      '~~~~~~',
+      '.C.~##',
+      '~~~~#E',
+      '#P~~~#',
+    ],
+    wall: [
+      '              ',
+      '              ',
+      '        =     ',
+      '     O  =   O ',
+    ],
+  },
+  {
+    name: 'Skid',
+    hint: 'Inside the wall, the ground in front of ice is slippery too.',
+    floor: [
+      '~~~~~~',
+      '~~~~~.',
+      '.~C.~.',
+      '.~~~~A',
+      'P.~~#E',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      ' O     L        ',
+    ],
+  },
+  // ---------------- Rubber crates ----------------
+  {
+    name: 'Rubber Crate',
+    hint: 'Rubber crates roll until they hit something, then bounce back one tile.',
+    floor: [
+      '#E#...',
+      '#A#...',
+      '..K...',
+      '.a....',
+      'P.....',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '                ',
+    ],
+  },
+  {
+    name: 'Springboard',
+    hint: 'In the wall, a rubber crate is a springboard: it lets you jump two blocks high.',
+    floor: [
+      '......',
+      '.K...#',
+      '.C..#E',
+      '.P...#',
+    ],
+    wall: [
+      '              ',
+      '        =     ',
+      '        =     ',
+      '     O  =   O ',
+    ],
+  },
+  {
+    name: 'Ricochet',
+    hint: 'Pushed from right beside a wall, a rubber crate has no room to bounce.',
+    floor: [
+      '#E#...',
+      '#A#.K.',
+      '.....a',
+      '......',
+      'P.....',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '                ',
+    ],
+  },
+  // ---------------- Lily pads ----------------
+  {
+    name: 'Lily Pad',
+    hint: 'Step onto a lily pad, then push off: it drifts until it bumps into something.',
+    floor: [
+      'wwwwww',
+      'wwlwww',
+      '.ww.ww',
+      '#wwEww',
+      'Plwwww',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '                ',
+    ],
+  },
+  {
+    name: 'Floating Floor',
+    hint: 'Water is a gap in the wall, but a lily pad against the wall is solid ground.',
+    floor: [
+      '..w...',
+      '.www.#',
+      '.lww#E',
+      'P.ww.#',
+    ],
+    wall: [
+      '              ',
+      '              ',
+      '              ',
+      ' O          O ',
+    ],
+  },
+  {
+    name: 'Sink or Swim',
+    hint: 'Crates sink in water and leave a stepping stone for pads to bump into.',
+    floor: [
+      'wEwwww',
+      'w#www.',
+      '#wwwww',
+      'lw#wCw',
+      'P.wC.w',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '                ',
+    ],
+  },
+  // ---------------- Light ----------------
+  {
+    name: 'Light Beam',
+    hint: 'A lit sensor switches on its colour. Push mirror crates to turn the beam.',
+    floor: [
+      '#E#...',
+      '#A#...',
+      '...\\..',
+      '>.....',
+      'P....1',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '                ',
+    ],
+  },
+  {
+    name: 'Shadow',
+    hint: 'Standing in a beam blocks it. Inside the wall you cast no shadow.',
+    floor: [
+      '....#E',
+      '....#A',
+      '.....1',
+      '>../..',
+      'P.....',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '            O  O',
+    ],
+  },
+  {
+    name: 'Prism',
+    hint: 'Two mirrors, one beam. Mind the order you move them in.',
+    floor: [
+      '!...#E',
+      '.#..#A',
+      '.....1',
+      '..\\/..',
+      'P..#..',
+    ],
+    wall: [
+      '                ',
+      '                ',
+      '                ',
+      '            O  O',
+    ],
+  },
 ];
 if (typeof module !== 'undefined' && module.exports) module.exports = LEVELS; else root.PF_LEVELS = LEVELS;
 })(typeof self !== 'undefined' ? self : this);

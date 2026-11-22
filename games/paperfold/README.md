@@ -10,7 +10,16 @@ Each level is a small 3D room seen at an angle. Its walls are a flat 2D world. W
 - Plates hold doors open while something stands on them, and you leave the plate when you step into the wall.
 - Linked swirl pads teleport you and crates.
 
-12 rooms, each checked by a solver (`node test_levels.js`).
+Rooms 13–24 add four more mechanics, three rooms each. Each one also does something inside the wall:
+
+| Mechanic | In the room | In the wall |
+|----------|-------------|-------------|
+| Ice `~` | You and crates slide until something stops you. Plain floor works as a brake. | The ground in front of ice is slippery too, so you skid past levers and portals unless something stops you. |
+| Rubber crate `K` | Rolls until it hits something, then bounces back one tile. Pushed from right beside an obstacle, it has no room to bounce. | A springboard: standing on it you can jump two blocks high instead of one. |
+| Water `w` and lily pads `l` | Water is a pit. Stand on a pad and push off: it drifts with you until it bumps into land, another pad or the room's edge. Crates sink in water and make solid ground. | Water is a gap in the ground; a lily pad against the wall is solid ground. |
+| Light `> < ^ !`, mirror crates `/` `\`, sensors `1` `2` | A lit sensor switches its colour on. Mirror crates turn the beam. Crates and you block it. | You cast no shadow while you're in the wall, so the beam gets through. |
+
+24 rooms, each checked by a solver (`node test_levels.js`).
 
 ## Play locally
 
@@ -24,7 +33,7 @@ Controls: Arrows/WASD move. In the wall, ◀ ▶ walk and climb, and ▲ (or Spa
 ## Files
 
 - `logic.js` – puzzle rules and the BFS solver (also runs in Node)
-- `levels.js` – the 12 rooms (format explained at the top of `logic.js`)
+- `levels.js` – the 24 rooms (format explained at the top of `logic.js`)
 - `game.js` – rendering, animation, input, menus, ads
 - `test_levels.js` – solves every room; exits with an error if one is unsolvable
 

@@ -76,6 +76,10 @@ const Sound = (() => {
     undo: () => tone('triangle', 600, 400, 0.08, 0.1),
     win: () => { const t = now(); [72, 76, 79, 84, 88].forEach((n, i) => tone('triangle', N(n), N(n), 0.3, 0.14, t + i * 0.08)); },
     hint: () => { const t = now(); [79, 84].forEach((n, i) => tone('sine', N(n), N(n), 0.25, 0.12, t + i * 0.1)); },
+    slide: () => noise(0.32, 0.08, 'highpass', 5000, 2500, 0, 0.7),
+    boing: () => { tone('sine', 220, 520, 0.09, 0.2); tone('sine', 520, 260, 0.18, 0.12, now() + 0.08); },
+    splash: () => { noise(0.3, 0.14, 'lowpass', 1800, 300, 0, 0.8); tone('sine', 420, 180, 0.15, 0.06); },
+    beam: () => { tone('sine', N(88), N(91), 0.18, 0.05); tone('triangle', N(76), N(76), 0.25, 0.05, now() + 0.06); },
   };
   const CH = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]];   // Cmaj7 Am7 Fmaj7 G7
   const STEP = 60 / 72 / 2;
@@ -149,7 +153,8 @@ const Platform = (() => {
 // ---------------------------------------------------------------------
 //  Canvas
 // ---------------------------------------------------------------------
-const canvas = $('game'), ctx = canvas.getContext('2d'), wrap = $('wrap');
+const canvas = $('game'), wrap = $('wrap');
+let ctx = canvas.getContext('2d');
 let viewScale = 1, dpr = 1;
 function resize() {
   viewScale = Math.min(window.innerWidth / W, window.innerHeight / H);
@@ -176,6 +181,7 @@ let cam = null;
 
 function loadLevel(i) {
   lvl = i; st = PF.parse(LEVELS[i]); st.WH = st.H * 0.75;
+  fadeLvl.clear();
   cur = PF.init(st); undoStack = []; moves = 0; anim = null; queued = null; hintMoves = null; msg = null; deathAnim = null;
   fold = foldTarget = 0;
   tex.width = st.S * CELL_W; tex.height = st.H * CELL_H;
@@ -245,17 +251,28 @@ function tryMove(dir) {
   const prev = cur; cur = res.s; moves++;
   hintMoves = hintMoves && hintMoves[0] === dir ? hintMoves.slice(1) : null;
   let dur = ANIM_DUR;
+  const colBefore = [PF.colorOn(st, prev, 0), PF.colorOn(st, prev, 1)];
   for (const e of res.ev) {
-    if (e.t === 'move') Sound.play('step');
-    if (e.t === 'move2') Sound.play('paper');
-    if (e.t === 'push') Sound.play('push');
-    if (e.t === 'fill' || e.t === 'drop') { Sound.play('fill'); dur = 0.22; }
+    if (e.t === 'move') {
+      const d = Math.abs(e.to[0] - e.from[0]) + Math.abs(e.to[1] - e.from[1]);
+      if (d > 1) { dur = Math.max(dur, 0.06 + 0.075 * d); if (!res.ev.some(x => x.t === 'raft')) Sound.play('slide'); } else Sound.play('step');
+    }
+    if (e.t === 'raft') { Sound.play('splash'); const d = Math.abs(e.to % st.W - e.from % st.W) + Math.abs(((e.to / st.W) | 0) - ((e.from / st.W) | 0)); dur = Math.max(dur, 0.12 + 0.1 * d); }
+    if (e.t === 'move2') { Sound.play('paper'); if (Math.abs(e.to[0] - e.from[0]) > 1) { Sound.play('slide'); dur = Math.max(dur, 0.06 + 0.07 * Math.abs(e.to[0] - e.from[0])); } }
+    if (e.t === 'push' || e.t === 'fill' || e.t === 'ctele') {
+      if (e.t === 'push') Sound.play('push');
+      if (e.path.length > 2) { dur = Math.max(dur, 0.06 + 0.07 * (e.path.length - 1)); if (e.kind !== 'K') Sound.play('slide'); }
+    }
+    if (e.t === 'bounce' || e.t === 'spring') Sound.play('boing');
+    if (e.t === 'fill' && st.tiles[e.to] === 'w') Sound.play('splash');
+    if (e.t === 'fill' || e.t === 'drop') { Sound.play('fill'); dur = Math.max(dur, e.path ? 0.16 + 0.07 * e.path.length : 0.22); }
     if (e.t === 'tele' || e.t === 'ctele') { Sound.play('tele'); dur = 0.24; }
     if (e.t === 'enter') { Sound.play('enter'); foldTarget = 1; }
     if (e.t === 'exit') { Sound.play('exit'); foldTarget = 0; }
     if (e.t === 'lever') { Sound.play('lever'); Sound.play('door'); }
     if (e.t === 'move2' && Math.abs(e.to[1] - e.from[1]) > 0) dur = Math.max(dur, 0.12 + 0.05 * Math.abs(e.to[1] - e.from[1]));
   }
+  if (PF.colorOn(st, cur, 0) !== colBefore[0] || PF.colorOn(st, cur, 1) !== colBefore[1]) { Sound.play('door'); if (st.emit.length) Sound.play('beam'); }
   anim = { t: 0, dur, prev, ev: res.ev };
   if (cur.won) { Sound.play('win'); setTimeout(winLevel, 650); }
 }
@@ -388,8 +405,14 @@ function drawTexture(time, playerCell) {
     }
     if (r === 0) {
       const [tx, ty] = PF.colTile(st, c), ti = ty * st.W + tx, tile = st.tiles[ti];
+      const bk = PF.boxAt(cur, ti);
       if (tile === '#') silhouette(t, x, y, '#8d8a85', '#6b6863');
-      else if (PF.hasCrate(cur, ti) && !(anim && animCrateTo(ti))) silhouette(t, x, y, '#a5713f', '#7a4f26');
+      else if (PF.EMIT[tile]) { silhouette(t, x, y, '#4a4458', '#2a2533'); t.fillStyle = '#fff3a0'; t.beginPath(); t.arc(x + CELL_W / 2, y + CELL_H / 2 + 3, 6, 0, TAU); t.fill(); }
+      else if (bk && !(anim && animCrateTo(ti))) {
+        if (bk === 'balls') { spring(t, x, y); }
+        else if (bk === 'crates') silhouette(t, x, y, '#a5713f', '#7a4f26');
+        else silhouette(t, x, y, '#8fa6bd', '#56697d');
+      }
       else if (PF.doorClosed(st, cur, ti)) silhouette(t, x, y, tile === 'A' ? RED : BLUE, 'rgba(0,0,0,.3)');
     }
   }
@@ -444,6 +467,15 @@ function silhouette(t, x, y, col, dark) {
   t.strokeStyle = dark; t.lineWidth = 2; t.strokeRect(x + 4, y + 6, CELL_W - 8, CELL_H - 6);
   t.beginPath(); t.moveTo(x + 4, y + 6); t.lineTo(x + CELL_W - 4, y + CELL_H); t.moveTo(x + CELL_W - 4, y + 6); t.lineTo(x + 4, y + CELL_H); t.stroke();
 }
+// a rubber crate seen from the wall: a springboard
+function spring(t, x, y) {
+  t.fillStyle = '#34a46c'; t.fillRect(x + 4, y + 6, CELL_W - 8, CELL_H - 6);
+  t.fillStyle = '#5fd39a'; t.fillRect(x + 4, y + 6, CELL_W - 8, 8);
+  t.strokeStyle = '#1f6e47'; t.lineWidth = 2; t.strokeRect(x + 4, y + 6, CELL_W - 8, CELL_H - 6);
+  t.strokeStyle = 'rgba(255,255,255,.8)'; t.lineWidth = 3; t.beginPath();
+  const cx = x + CELL_W / 2; for (let k = 0; k <= 6; k++) { const px = cx + (k % 2 ? 10 : -10), py = y + 18 + k * 4; k ? t.lineTo(px, py) : t.moveTo(px, py); }
+  t.stroke();
+}
 function animCrateTo(i) { return anim.ev.some(e => (e.t === 'push' || e.t === 'ctele') && e.to === i && anim.t < 1); }
 
 // textured triangle (affine map of a texture triangle onto a screen triangle)
@@ -486,8 +518,13 @@ function drawGroundBand(alpha) {
   ctx.drawImage(tex, L.x0, L.y0, st.S * L.cw, st.H * L.ch);
   for (let c = 0; c < st.S; c++) {
     const [tx, ty] = PF.colTile(st, c), ti = ty * st.W + tx, x = L.x0 + c * L.cw;
-    if (PF.isPit(st, cur, ti)) { ctx.fillStyle = '#120e1f'; ctx.fillRect(x, y, L.cw, L.ch * 0.55); }
-    else { ctx.fillStyle = st.tiles[ti] === 'E' ? '#ffd166' : PF.isPit(st, { ...cur, filled: [] }, ti) ? '#9c7a4c' : '#cdbb98'; ctx.fillRect(x, y, L.cw, L.ch * 0.55); ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x, y, 1, L.ch * 0.55); }
+    const tt = st.tiles[ti], filledHere = cur.filled.indexOf(ti) >= 0;
+    if (PF.isPit(st, cur, ti)) { ctx.fillStyle = tt === 'w' ? '#1d4f8c' : '#120e1f'; ctx.fillRect(x, y, L.cw, L.ch * 0.55); }
+    else {
+      ctx.fillStyle = tt === 'E' ? '#ffd166' : filledHere || PF.isPit(st, { ...cur, filled: [] }, ti) && tt !== 'w' ? '#9c7a4c' : tt === 'w' ? '#4caf50' : tt === '~' ? '#bfe6f7' : '#cdbb98';
+      ctx.fillRect(x, y, L.cw, L.ch * 0.55); ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x, y, 1, L.ch * 0.55);
+      if (tt === '~' && !filledHere) { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(x + L.cw * 0.2, y + 3, L.cw * 0.35, 3); }
+    }
   }
   ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.font = '700 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('LEFT WALL', L.x0 + st.D * L.cw / 2, L.y0 - 22);
@@ -519,6 +556,17 @@ function drawFloor(time) {
     const filled = cur.filled.indexOf(i) >= 0 && !(anim && anim.t < 1 && anim.ev.some(e => (e.t === 'fill' || e.t === 'drop') && (e.to === i || e.i === i)));
     const pit = PF.isPit(st, cur, i) || (cur.filled.indexOf(i) >= 0 && !filled);
     const checker = (x + y) % 2 ? '#d9cdb4' : '#e4d9c2';
+    if (t === 'w' && !filled) {
+      quad(tileQuad(x, y), '#2f6fb8');
+      const behind = y > 0 ? st.tiles[i - st.W] : '#';
+      if (behind !== 'w' || cur.filled.indexOf(i - st.W) >= 0) quad([P(x, y, 0), P(x + 1, y, 0), P(x + 1, y, -0.25), P(x, y, -0.25)], '#1d4f8c');
+      for (let k = 0; k < 2; k++) {
+        const ph = (time * 0.35 + (x * 0.37 + y * 0.61 + k * 0.5)) % 1;
+        const a = P(x + 0.15 + ph * 0.5, y + 0.3 + k * 0.4, 0.002), b = P(x + 0.35 + ph * 0.5, y + 0.3 + k * 0.4, 0.002);
+        ctx.strokeStyle = `rgba(200,230,255,${0.5 * Math.sin(ph * Math.PI)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+      }
+      continue;
+    }
     if (pit) {
       quad(tileQuad(x, y), '#15101f');
       quad([P(x, y, 0), P(x + 1, y, 0), P(x + 1, y, -0.5), P(x, y, -0.5)], '#2a2238');
@@ -532,8 +580,19 @@ function drawFloor(time) {
       for (let k = 0; k < 4; k++) quad([P(x + 0.04, y + k / 4 + 0.03, 0), P(x + 0.96, y + k / 4 + 0.03, 0), P(x + 0.96, y + (k + 1) / 4 - 0.03, 0), P(x + 0.04, y + (k + 1) / 4 - 0.03, 0)], col, 'rgba(0,0,0,.3)');
       continue;
     }
+    if (t === '~') {
+      quad(tileQuad(x, y), (x + y) % 2 ? '#bfe6f7' : '#cdeefb', 'rgba(90,150,190,.35)');
+      quad([P(x + 0.2, y + 0.75, 0.001), P(x + 0.45, y + 0.25, 0.001), P(x + 0.55, y + 0.25, 0.001), P(x + 0.3, y + 0.75, 0.001)], 'rgba(255,255,255,.75)');
+      continue;
+    }
     quad(tileQuad(x, y), checker, 'rgba(120,100,70,.25)');
-    if (t === 'E') {
+    if (t === '1' || t === '2') {
+      const on = PF.colorOn(st, cur, t === '1' ? 0 : 1), col = t === '1' ? RED : BLUE;
+      quad(tileQuad(x, y, 0.002, 0.12), '#3a3446', 'rgba(0,0,0,.4)');
+      ctx.beginPath();
+      for (let a = 0; a <= 20; a++) { const an = a / 20 * TAU, p = P(x + 0.5 + Math.cos(an) * 0.26, y + 0.5 + Math.sin(an) * 0.26, 0.004); a ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
+      ctx.fillStyle = on ? '#fff3a0' : col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+    } else if (t === 'E') {
       const pulse = 0.5 + 0.5 * Math.sin(time * 3);
       quad(tileQuad(x, y, 0.001, 0.06), `rgba(255,209,102,${0.6 + 0.3 * pulse})`);
       quad(tileQuad(x, y, 0.002, 0.25), '#fff3c4');
@@ -552,6 +611,53 @@ function drawFloor(time) {
       quad(tileQuad(x, y, 0.002, 0.04), null, t === 'A' ? RED : BLUE);
     }
   }
+  drawPads();
+}
+function drawPads() {
+  const raft = anim && anim.t < 1 ? anim.ev.find(e => e.t === 'raft') : null;
+  for (const i of cur.pads) {
+    let x = i % st.W, y = (i / st.W) | 0;
+    if (raft && raft.to === i) { const k = ease(anim.t); x = lerp(raft.from % st.W, x, k); y = lerp((raft.from / st.W) | 0, y, k); }
+    ctx.beginPath();
+    for (let a = 0; a <= 28; a++) {
+      const an = 0.35 + a / 28 * (TAU - 0.7), p = P(x + 0.5 + Math.cos(an) * 0.44, y + 0.5 + Math.sin(an) * 0.44, 0.01);
+      a ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+    }
+    const c = P(x + 0.5, y + 0.5, 0.01); ctx.lineTo(c[0], c[1]); ctx.closePath();
+    ctx.fillStyle = '#4caf50'; ctx.fill(); ctx.strokeStyle = '#2e7d32'; ctx.lineWidth = 2; ctx.stroke();
+    const v = P(x + 0.5 - 0.3, y + 0.5, 0.012); ctx.strokeStyle = 'rgba(30,90,35,.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.lineTo(v[0], v[1]); ctx.stroke();
+  }
+}
+function rubberAt(x, y, z = 0, alpha = 1) {
+  ctx.globalAlpha = alpha;
+  cube(x + 0.12, y + 0.12, x + 0.88, y + 0.88, z, z + 0.72, '#5fd39a', '#34a46c', '#2b8a5a', 'rgba(20,70,45,.6)');
+  const a = P(x + 0.5, y + 0.5, z + 0.721);
+  ctx.beginPath();
+  for (let k = 0; k <= 20; k++) { const an = k / 20 * TAU, p = P(x + 0.5 + Math.cos(an) * 0.22, y + 0.5 + Math.sin(an) * 0.22, z + 0.721); k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(a[0], a[1], 2.5, 0, TAU); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+// mirror crate: a low base with a pane of glass along its diagonal
+function mirrorAt(x, y, kind, z = 0, alpha = 1) {
+  ctx.globalAlpha = alpha;
+  cube(x + 0.1, y + 0.1, x + 0.9, y + 0.9, z, z + 0.22, '#8fa6bd', '#6f8499', '#5d7083');
+  const [ax, ay, bx, by] = kind === '/' ? [x + 0.14, y + 0.86, x + 0.86, y + 0.14] : [x + 0.14, y + 0.14, x + 0.86, y + 0.86];
+  quad([P(ax, ay, z + 0.22), P(bx, by, z + 0.22), P(bx, by, z + 0.95), P(ax, ay, z + 0.95)], 'rgba(190,235,255,.72)', 'rgba(255,255,255,.9)');
+  const m0 = P(lerp(ax, bx, 0.3), lerp(ay, by, 0.3), z + 0.75), m1 = P(lerp(ax, bx, 0.5), lerp(ay, by, 0.5), z + 0.85);
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+function boxAt3(kind, x, y, z = 0, alpha = 1) {
+  if (kind === 'K') rubberAt(x, y, z, alpha);
+  else if (kind === '/' || kind === '\\') mirrorAt(x, y, kind, z, alpha);
+  else crateAt(x, y, z, alpha);
+}
+function emitterAt(x, y, d, time) {
+  cube(x + 0.08, y + 0.08, x + 0.92, y + 0.92, 0, 0.75, '#5b5468', '#4a4458', '#3d3849');
+  const c = P(x + 0.5 + d[0] * 0.43, y + 0.5 + d[1] * 0.43, 0.42), s = Math.abs(P(x + 0.5, y + 0.5, 0)[1] - P(x + 0.5, y + 0.5, 0.2)[1]);
+  ctx.fillStyle = '#fff3a0'; ctx.globalAlpha = 0.6 + 0.3 * Math.sin(time * 4); ctx.beginPath(); ctx.arc(c[0], c[1], Math.max(4, s * 0.7), 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+  const top = P(x + 0.5, y + 0.5, 0.751); ctx.fillStyle = '#fff3a0'; ctx.beginPath(); ctx.arc(top[0], top[1], 3, 0, TAU); ctx.fill();
 }
 function crateAt(x, y, z = 0, alpha = 1) {
   ctx.globalAlpha = alpha;
@@ -569,10 +675,11 @@ function drawObjects(time, pl) {
   const redOn = PF.colorOn(st, cur, 0), blueOn = PF.colorOn(st, cur, 1);
   for (let y = 0; y < st.D; y++) for (let x = 0; x < st.W; x++) {
     const i = y * st.W + x, t = st.tiles[i];
-    if (t === '#') list.push({ y, x, f: () => cube(x, y, x + 1, y + 1, 0, 1, '#b7b2aa', '#9a958d', '#85807a') });
+    if (t === '#') list.push({ y, x, key: 'r' + i, box: [x, y, x + 1, y + 1, 1], f: () => cube(x, y, x + 1, y + 1, 0, 1, '#b7b2aa', '#9a958d', '#85807a') });
+    if (PF.EMIT[t]) list.push({ y, x, key: 'e' + i, box: [x + 0.08, y + 0.08, x + 0.92, y + 0.92, 0.75], f: () => emitterAt(x, y, PF.EMIT[t], time) });
     if ((t === 'A' || t === 'B') && PF.doorClosed(st, cur, i)) {
       const col = t === 'A' ? RED : BLUE;
-      list.push({ y, x, f: () => { ctx.globalAlpha = 0.85; cube(x + 0.04, y + 0.3, x + 0.96, y + 0.7, 0, 1.1, col, col, col, 'rgba(0,0,0,.45)'); ctx.globalAlpha = 1; } });
+      list.push({ y, x, key: 'd' + i, box: [x + 0.04, y + 0.3, x + 0.96, y + 0.7, 1.1], f: () => { ctx.globalAlpha = 0.85; cube(x + 0.04, y + 0.3, x + 0.96, y + 0.7, 0, 1.1, col, col, col, 'rgba(0,0,0,.45)'); ctx.globalAlpha = 1; } });
     }
     if (t === 'E') list.push({ y: y + 0.01, x, f: () => {
       const b = P(x + 0.5, y + 0.5, 0.75 + Math.sin(time * 2.5) * 0.08), s = Math.abs(P(x + 0.5, y + 0.5, 0)[1] - P(x + 0.5, y + 0.5, 0.4)[1]);
@@ -582,34 +689,113 @@ function drawObjects(time, pl) {
       ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
     } });
   }
-  // crates (with animation)
+  // blocks (with animation along their path)
   const moving = new Map();
   if (anim && anim.t < 1) for (const e of anim.ev) {
-    if (e.t === 'push' || e.t === 'fill' || e.t === 'ctele') moving.set(e.to, e);
+    if (e.t === 'push' || e.t === 'fill' || e.t === 'ctele') moving.set(e.t === 'fill' ? -1000 - e.to : e.to, e);
     if (e.t === 'drop') moving.set(-1 - e.i, e);
   }
-  for (const ci of cur.crates) {
-    const x = ci % st.W, y = (ci / st.W) | 0, e = moving.get(ci);
-    if (e && e.t === 'push') { const k = ease(anim.t), fx = e.from % st.W, fy = (e.from / st.W) | 0; list.push({ y: lerp(fy, y, k), x, f: () => crateAt(lerp(fx, x, k), lerp(fy, y, k)) }); }
+  const along = (path, k) => {
+    const f = clamp(k, 0, 1) * (path.length - 1), a = Math.floor(f), b = Math.min(path.length - 1, a + 1), u = f - a;
+    return [lerp(path[a] % st.W, path[b] % st.W, u), lerp((path[a] / st.W) | 0, (path[b] / st.W) | 0, u)];
+  };
+  for (const list0 of PF.BOXES) for (const ci of cur[list0]) {
+    const kind = PF.KIND[list0], x = ci % st.W, y = (ci / st.W) | 0, e = moving.get(ci);
+    if (e && e.t === 'push') { const [px, py] = along(e.path, anim.t < 0.999 ? ease(anim.t) : 1); list.push({ y: py, x: px, key: 'b' + ci, box: [px + 0.1, py + 0.1, px + 0.9, py + 0.9, 0.95], f: () => boxAt3(kind, px, py) }); }
     else if (e && e.t === 'ctele') {
-      const k = anim.t, fx = e.from % st.W, fy = (e.from / st.W) | 0, mx = e.mid % st.W, my = (e.mid / st.W) | 0;
-      if (k < 0.5) list.push({ y: my, x: mx, f: () => crateAt(lerp(fx, mx, k * 2), lerp(fy, my, k * 2), 0, 1 - k) });
-      else list.push({ y, x, f: () => crateAt(x, y, (1 - k) * 0.6, k) });
-    } else list.push({ y, x, f: () => crateAt(x, y) });
+      const k = anim.t, mx = e.mid % st.W, my = (e.mid / st.W) | 0;
+      if (k < 0.5) { const [px, py] = along(e.path, k * 2); list.push({ y: my, x: mx, f: () => boxAt3(kind, px, py, 0, 1 - k) }); }
+      else list.push({ y, x, f: () => boxAt3(kind, x, y, (1 - k) * 0.6, k) });
+    } else list.push({ y, x, key: 'b' + ci, box: [x + 0.1, y + 0.1, x + 0.9, y + 0.9, 0.95], f: () => boxAt3(kind, x, y) });
   }
   for (const [kk, e] of moving) if (e.t === 'fill') {
-    const k = anim.t, fx = e.from % st.W, fy = (e.from / st.W) | 0, tx = e.to % st.W, ty = (e.to / st.W) | 0;
-    list.push({ y: ty - 0.01, x: tx, f: () => crateAt(lerp(fx, tx, Math.min(1, k * 1.6)), lerp(fy, ty, Math.min(1, k * 1.6)), -Math.max(0, k - 0.5) * 1.6) });
-  } else if (e.t === 'drop') { const tx = e.i % st.W, ty = (e.i / st.W) | 0; list.push({ y: ty - 0.01, x: tx, f: () => crateAt(tx, ty, -anim.t * 0.8) }); }
+    const k = anim.t, tx = e.to % st.W, ty = (e.to / st.W) | 0, n = e.path.length, slideK = (n - 1) / n;
+    const [px, py] = along(e.path, Math.min(1, k / slideK));
+    list.push({ y: ty - 0.01, x: tx, f: () => boxAt3(e.kind, px, py, -Math.max(0, k - slideK) / (1 - slideK) * 0.8) });
+  } else if (e.t === 'drop') { const tx = e.i % st.W, ty = (e.i / st.W) | 0; list.push({ y: ty - 0.01, x: tx, f: () => boxAt3(e.kind, tx, ty, -anim.t * 0.8) }); }
+  // light beams, cut into short pieces so they sort in depth with everything else
+  if (st.emit.length) for (const pts of PF.beams(st, cur).paths) for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], len = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.ceil(len / 0.5));
+    for (let j = 0; j < n; j++) {
+      const x0 = lerp(ax, bx, j / n), y0 = lerp(ay, by, j / n), x1 = lerp(ax, bx, (j + 1) / n), y1 = lerp(ay, by, (j + 1) / n);
+      list.push({ y: Math.max(y0, y1) - 0.5 + 0.03, x: (x0 + x1) / 2 - 0.5, f: () => beamSeg(x0, y0, x1, y1, time) });
+    }
+  }
   if (pl) list.push({ y: pl.y + 0.02, x: pl.x, f: () => playerBillboard(pl.x, pl.y, pl.z || 0, cur.face, pl.a == null ? 1 : pl.a, pl.sq || 0) });
   const cx = st.W / 2 - 0.5;
   list.sort((a, b) => a.y - b.y || Math.abs(b.x - cx) - Math.abs(a.x - cx));
-  for (const o of list) o.f();
+  markHiders(list, pl);
+  for (const o of list) {
+    const a = o.key ? fadeNow(o.key, o.hides) : 1;
+    if (a > 0.99) { o.f(); continue; }
+    // draw the block on its own layer, then lay it down see-through
+    if (fadeCv.width !== canvas.width || fadeCv.height !== canvas.height) { fadeCv.width = canvas.width; fadeCv.height = canvas.height; }
+    const main = ctx; ctx = fadeCtx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, fadeCv.width, fadeCv.height);
+    ctx.setTransform(main.getTransform());
+    try { o.f(); } finally { ctx = main; }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = a; ctx.drawImage(fadeCv, 0, 0); ctx.restore();
+  }
   // hint arrow at the player's feet
   if (hintMoves && hintMoves.length && cur.m === 0 && !anim) {
     const d = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0] }[hintMoves[0]];
     const a = P(cur.x + 0.5, cur.y + 0.5, 0.02), b = P(cur.x + 0.5 + d[0] * 0.85, cur.y + 0.5 + d[1] * 0.85, 0.02);
     arrow(a, b, '#ffd166');
+  }
+}
+function beamSeg(x0, y0, x1, y1, time) {
+  const a = P(x0, y0, 0.42), b = P(x1, y1, 0.42);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = `rgba(255,236,140,${0.28 + 0.08 * Math.sin(time * 6)})`; ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  ctx.strokeStyle = '#fff6c8'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  ctx.lineCap = 'butt';
+}
+// ---- see-through blocks ----
+// A block (stone, door, crate, emitter) that covers a plate, swirl pad,
+// sensor or the player turns see-through while it does.
+const fadeCv = document.createElement('canvas'), fadeCtx = fadeCv.getContext('2d');
+const fadeLvl = new Map();
+const FADE_MIN = 0.35, KEY_TILES = 'abTtVv12';   // the exit has its floating star, so it never needs revealing
+function fadeNow(key, hides) {
+  const target = hides ? FADE_MIN : 1, prev = fadeLvl.has(key) ? fadeLvl.get(key) : target;
+  const a = Math.abs(prev - target) < 0.02 ? target : lerp(prev, target, 0.18);
+  fadeLvl.set(key, a); return a;
+}
+function hull(pts) {
+  pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function inHull(h, p) {
+  for (let i = 0; i < h.length; i++) { const a = h[i], b = h[(i + 1) % h.length]; if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) < 0) return false; }
+  return true;
+}
+function keyTargets(pl) {
+  const out = [];
+  for (let i = 0; i < st.tiles.length; i++) {
+    if (!KEY_TILES.includes(st.tiles[i])) continue;
+    const x = i % st.W, y = (i / st.W) | 0;
+    out.push({ x, y, need: 2, pts: [[0.5, 0.5], [0.22, 0.22], [0.78, 0.22], [0.22, 0.78], [0.78, 0.78]].map(([u, v]) => P(x + u, y + v, 0)) });
+  }
+  if (pl && (pl.a == null || pl.a > 0.3)) out.push({ x: pl.x, y: pl.y + 0.02, need: 2, player: true, pts: [0.15, 0.5, 0.85].map(z => P(pl.x + 0.5, pl.y + 0.55, (pl.z || 0) + z)) });
+  return out;
+}
+function markHiders(list, pl) {
+  const targets = keyTargets(pl);
+  for (const o of list) {
+    if (!o.box) continue;
+    const [x0, y0, x1, y1, z1] = o.box, cs = [];
+    for (const xx of [x0, x1]) for (const yy of [y0, y1]) for (const zz of [0, z1]) cs.push(P(xx, yy, zz));
+    const h = hull(cs);
+    o.hides = targets.some(t => {
+      if (Math.abs(t.x - o.x) < 0.5 && Math.abs(t.y - o.y) < 0.5) return false;   // standing on it, not hiding it
+      if (t.player ? o.y <= t.y : o.y < t.y) return false;                          // behind it, drawn first
+      let n = 0; for (const p of t.pts) if (inHull(h, p)) n++;
+      return n >= t.need;
+    });
   }
 }
 function arrow(a, b, col) {
@@ -813,6 +999,7 @@ function tick(dt) {
     // jump n moves into the solution (for screenshots)
     jump(n) { const sol = PF.solve(st, cur, 2000000); for (const m of sol.slice(0, n)) { cur = PF.step(st, cur, m).s; moves++; } anim = null; fold = foldTarget = cur.m; return cur.m; },
     set hideHud(v) { hideHud = v; },
+    get fades() { return [...fadeLvl].filter(([k, a]) => a < 1).map(([k]) => k); },
     snap(w = 1920) {
       const vs = viewScale, d = dpr; viewScale = w / W; dpr = 1; canvas.width = w; canvas.height = Math.round(w * H / W);
       render(performance.now() / 1000); const url = canvas.toDataURL('image/png'); viewScale = vs; dpr = d; resize(); return url;
