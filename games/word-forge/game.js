@@ -375,7 +375,8 @@ const GRID = { x: 640 - 2 * 74 + 2, y: 404, s: 70, g: 4 };
 function tileRect(i) { const c = i % 4, r = (i / 4) | 0; return { x: GRID.x + c * (GRID.s + GRID.g), y: GRID.y + r * (GRID.s + GRID.g), w: GRID.s, h: GRID.s }; }
 const BTN = { forge: { x: 946, y: 520, w: 210, h: 92 }, clear: { x: 180, y: 470, w: 170, h: 58 }, shuffle: { x: 180, y: 540, w: 170, h: 58 }, potion: { x: 180, y: 610, w: 170, h: 58 }, hint: { x: 946, y: 628, w: 210, h: 46 } };
 
-function startRun(seed) { R = newRun(seed); sel = []; hintIdx = null; floaters = []; setState('play'); }
+let runId = 0;
+function startRun(seed) { runId++; busy = 0; anims = []; R = newRun(seed); sel = []; hintIdx = null; floaters = []; setState('play'); }
 function toggleTile(i) {
   if (state !== 'play' || busy > 0) return;
   const k = sel.indexOf(i);
@@ -384,7 +385,8 @@ function toggleTile(i) {
   sel.push(i); Sound.play('tile', 0, sel.length);
 }
 function typeLetter(ch) {
-  if (state !== 'play' || busy > 0) return;
+  if (state !== 'play' || busy > 0 || Platform.inAd) return;
+  if (ch === 'u' && sel.length && R.tiles[sel[sel.length - 1]].ch === 'q') return;   // the Qu tile already has its u
   const i = R.tiles.findIndex((t, j) => t.ch === ch && !sel.includes(j) && !t.lock);
   if (i >= 0) toggleTile(i); else Sound.play('bad');
 }
@@ -400,6 +402,7 @@ function doShuffle() { if (state !== 'play' || busy > 0) return; sel = []; hintI
 function potion() { if (state !== 'play' || busy > 0) return; if (drinkPotion(R)) { Sound.play('heal'); floaters.push({ x: 250, y: 200, s: '+15', c: '#7dff9a', t: 0 }); } else Sound.play('bad'); }
 function runEvents(ev) {
   let t = 0; busy = 1;
+  const id = runId, setTimeout = (f, ms) => window.setTimeout(() => { if (id === runId && R) f(); }, ms);   // ignore timers from a run that has ended
   for (const e of ev) {
     const at = t;
     if (e.t === 'strike') { setTimeout(() => { Sound.play('forge', 0, e.n); anims.push({ k: 'blade', t: 0, n: e.n, word: e.word }); }, at * 1000); setTimeout(() => { Sound.play('hit', 0, e.dmg > 30); monFlash = 0.3; shake = Math.min(14, 4 + e.dmg / 6); floaters.push({ x: 900, y: 160, s: '-' + e.dmg, c: '#ffd34d', t: 0, big: true }); }, (at + 0.45) * 1000); t += 0.8; }
@@ -425,11 +428,11 @@ function winFight() {
   const ch = boonChoices(R);
   $('boonTitle').textContent = MONSTERS[R.stage - 1].name + ' defeated!';
   $('boonSub').textContent = (R.stage % 5 === 0 ? `Act ${R.stage / 5} cleared! ` : '') + 'You rest a little (+30% health). Choose a boon:';
-  const box = $('boons'); box.innerHTML = '';
+  const box = $('boons'); box.innerHTML = ''; delete box.dataset.done;
   for (const b of ch) {
     const d = document.createElement('button'); d.className = 'boon';
     d.innerHTML = `<i>${b.icon}</i><b>${b.name}</b><small>${b.desc}</small>`;
-    d.onclick = () => { applyBoon(R, b.id); Sound.play('boon'); nextFight(); };
+    d.onclick = () => { if (box.dataset.done) return; box.dataset.done = '1'; applyBoon(R, b.id); Sound.play('boon'); nextFight(); };
     box.appendChild(d);
   }
   setState('boon');
@@ -625,7 +628,7 @@ function render(time) {
 // ---------------------------------------------------------------------
 const inRect = (p, b) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
 canvas.addEventListener('pointerdown', e => {
-  if (state !== 'play') return;
+  if (state !== 'play' || Platform.inAd) return;
   const p = toCanvas(e);
   for (let i = 0; i < 16; i++) if (inRect(p, tileRect(i))) { toggleTile(i); return; }
   if (inRect(p, BTN.forge)) forge();
@@ -636,6 +639,7 @@ canvas.addEventListener('pointerdown', e => {
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 window.addEventListener('keydown', e => {
+  if (Platform.inAd) return;
   if (state === 'play') {
     if (/^Key[A-Z]$/.test(e.code) && !e.ctrlKey && !e.metaKey && !e.altKey) { typeLetter(e.code[3].toLowerCase()); return; }
     if (e.code === 'Backspace') { e.preventDefault(); if (sel.length) { sel.pop(); Sound.play('untile'); } }
@@ -654,9 +658,9 @@ let firstPlay = true;
 $('playBtn').onclick = () => { if (firstPlay) { firstPlay = false; $('playBtn').disabled = true; Platform.commercialBreak().then(() => { $('playBtn').disabled = false; startRun(); }); } else startRun(); };
 $('pauseBtn').onclick = () => pauseGame();
 $('resumeBtn').onclick = () => setState('play');
-$('quitBtn').onclick = () => { R = null; setState('menu'); };
+$('quitBtn').onclick = () => { runId++; busy = 0; R = null; setState('menu'); };
 $('againBtn').onclick = () => { $('againBtn').disabled = true; Platform.commercialBreak().then(() => { $('againBtn').disabled = false; startRun(); }); };
-$('menuBtn').onclick = () => { R = null; setState('menu'); };
+$('menuBtn').onclick = () => { runId++; busy = 0; R = null; setState('menu'); };
 $('reviveBtn').onclick = revive;
 const portraitMQ = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
 if (portraitMQ.addEventListener) portraitMQ.addEventListener('change', () => { if (portraitMQ.matches) pauseGame(); });
@@ -681,7 +685,7 @@ function frame(now) {
   requestAnimationFrame(t => { last = t; frame(t); });
   // DEBUG-START (removed from release builds by build.py)
   window.__wf = {
-    get R() { return R; }, get state() { return state; }, startRun, findWords, DICT, MONSTERS, toggleTile, forge,
+    get R() { return R; }, get state() { return state; }, get sel() { return sel; }, startRun, findWords, DICT, MONSTERS, toggleTile, forge,
     // bot: plays the k-th best word each turn (k = 0 strongest), drinks potions when low, picks boons in a fixed order
     simulate(runs, maxLen = 16, seed0 = 1) {
       const res = [];
